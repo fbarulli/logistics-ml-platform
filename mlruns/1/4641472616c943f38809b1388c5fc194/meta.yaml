@@ -1,0 +1,15 @@
+artifact_uri: file:///workspaces/logistics-ml-platform/mlruns/1/4641472616c943f38809b1388c5fc194/artifacts
+end_time: 1784140548860
+entry_point_name: ''
+experiment_id: '1'
+lifecycle_stage: active
+name: ''
+run_id: 4641472616c943f38809b1388c5fc194
+run_uuid: 4641472616c943f38809b1388c5fc194
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1784140491122
+status: 3
+tags: []
+user_id: vscode

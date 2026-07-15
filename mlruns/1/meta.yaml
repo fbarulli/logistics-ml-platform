@@ -1,0 +1,4 @@
+artifact_location: file:///workspaces/logistics-ml-platform/mlruns/1
+experiment_id: '1'
+lifecycle_stage: active
+name: taxi-trip-fare-prediction

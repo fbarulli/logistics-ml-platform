@@ -12,9 +12,12 @@ dependencies = [
     "mlflow>=1.27.0",
     "numpy>=2.5.1",
     "pandas>=3.0.3",
+    "protobuf<5.0.0",
     "psycopg[binary]>=3.3.4",
     "pyarrow>=25.0.0",
     "scikit-learn>=1.9.0",
+    "setuptools<82.0.0",
     "sqlalchemy>=2.0.51",
+    "tqdm>=4.68.4",
     "xgboost>=3.3.0",
 ]

@@ -1,39 +1,73 @@
+from io import StringIO
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
+from tqdm import tqdm
+
+DATABASE_URL = "postgresql+psycopg://logistics:logistics@localhost:5432/logistics"
+
+engine = create_engine(DATABASE_URL)
+
+DATA_DIR = Path("data/raw")
 
 
-DATABASE_URL = (
-    "postgresql+psycopg://logistics:logistics@localhost:5432/logistics"
-)
+def copy_chunk(df: pd.DataFrame) -> None:
+    buffer = StringIO()
+    df.to_csv(buffer, index=False, header=False)
+    buffer.seek(0)
 
-PARQUET_FILE = "data/raw/yellow_tripdata_2024-01.parquet"
+    conn = engine.raw_connection()
+    try:
+        cur = conn.cursor()
+
+        with cur.copy(
+            """
+            COPY taxi_trips (
+                vendor_id,
+                pickup_datetime,
+                dropoff_datetime,
+                passenger_count,
+                trip_distance,
+                pickup_location_id,
+                dropoff_location_id,
+                fare_amount,
+                tip_amount,
+                total_amount
+            )
+            FROM STDIN WITH (FORMAT CSV)
+            """
+        ) as copy:
+            while chunk := buffer.read(1024 * 1024):
+                copy.write(chunk)
+
+        conn.commit()
+
+    finally:
+        conn.close()
 
 
 def main():
-    engine = create_engine(DATABASE_URL)
+    print("Reading parquet...")
 
-    print("Loading parquet...")
-    df = pd.read_parquet(PARQUET_FILE)
-
-    print(df.head())
-    print(df.shape)
-
-    df = df.rename(
-        columns={
-            "VendorID": "vendor_id",
-            "tpep_pickup_datetime": "pickup_datetime",
-            "tpep_dropoff_datetime": "dropoff_datetime",
-            "passenger_count": "passenger_count",
-            "trip_distance": "trip_distance",
-            "PULocationID": "pickup_location_id",
-            "DOLocationID": "dropoff_location_id",
-            "fare_amount": "fare_amount",
-            "tip_amount": "tip_amount",
-            "total_amount": "total_amount",
-        }
+    df = pd.read_parquet(
+        "data/raw/yellow_tripdata_2024-01.parquet",
+        columns=[
+            "VendorID",
+            "tpep_pickup_datetime",
+            "tpep_dropoff_datetime",
+            "passenger_count",
+            "trip_distance",
+            "PULocationID",
+            "DOLocationID",
+            "fare_amount",
+            "tip_amount",
+            "total_amount",
+        ],
     )
 
-    columns = [
+    df.columns = [
         "vendor_id",
         "pickup_datetime",
         "dropoff_datetime",
@@ -46,17 +80,29 @@ def main():
         "total_amount",
     ]
 
-    df = df[columns]
+    chunk_size = 100000
 
-    print("Writing to PostgreSQL...")
+    for start in tqdm(
+        range(0, len(df), chunk_size),
+        desc="yellow_tripdata_2024-01.parquet",
+        unit="chunk",
+    ):
+        chunk = df.iloc[start:start + chunk_size].copy()
 
-    df.to_sql(
-        "taxi_trips",
-        engine,
-        if_exists="append",
-        index=False,
-        chunksize=5000,
-    )
+        # Convert nullable integer columns
+        chunk["vendor_id"] = chunk["vendor_id"].astype("Int64")
+        chunk["pickup_location_id"] = chunk["pickup_location_id"].astype(
+            "Int64")
+        chunk["dropoff_location_id"] = chunk["dropoff_location_id"].astype(
+            "Int64")
+        chunk["passenger_count"] = (
+            chunk["passenger_count"]
+            .fillna(0)
+            .round()
+            .astype("Int64")
+        )
+
+        copy_chunk(chunk)
 
     print("Done.")
 
