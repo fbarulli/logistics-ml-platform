@@ -1,40 +1,84 @@
 import argparse
 import time
 import mlflow
-import mlflow.sklearn
+
 import pandas as pd
+
 from sqlalchemy import create_engine
+
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.metrics import (
+    mean_absolute_error,
+    mean_squared_error,
+    r2_score,
+)
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 
 from lightgbm import LGBMRegressor
 from xgboost import XGBRegressor
 
-DATABASE_URL = "postgresql+psycopg://logistics:logistics@localhost:5432/logistics"
 
-parser = argparse.ArgumentParser()
-
-parser.add_argument(
-    "--model",
-    choices=["linear", "rf", "xgb", "lgbm"],
-    default="xgb",
-    help="Model to train",
+DATABASE_URL = (
+    "postgresql+psycopg://logistics:logistics@postgres:5432/logistics"
 )
 
-args = parser.parse_args()
+mlflow.set_tracking_uri(
+    "http://mlflow:5000"
+)
 
-MODEL_NAME = args.model
+EXPERIMENT_NAME = "taxi-duration-prediction"
+
+REGISTERED_MODEL_NAME = "taxi-duration-model"
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--model",
+        choices=[
+            "linear",
+            "rf",
+            "xgb",
+            "lgbm",
+        ],
+        default="xgb",
+        help="Model to train",
+    )
+
+    return parser.parse_args()
+
+
+def load_data():
+
+    print("Loading training data...")
+
+    engine = create_engine(DATABASE_URL)
+
+    df = pd.read_sql(
+        """
+        SELECT *
+        FROM training_data
+        """,
+        engine,
+    )
+
+    print(f"Loaded {len(df):,} rows")
+
+    return df
 
 
 def get_pipeline(model_name: str):
+
     if model_name == "linear":
+
         model = LinearRegression()
 
     elif model_name == "rf":
+
         model = RandomForestRegressor(
             n_estimators=100,
             max_depth=20,
@@ -44,121 +88,208 @@ def get_pipeline(model_name: str):
         )
 
     elif model_name == "xgb":
+
         model = XGBRegressor(
             n_estimators=300,
             max_depth=6,
             learning_rate=0.1,
             tree_method="hist",
             random_state=42,
+            n_jobs=-1,
         )
 
     elif model_name == "lgbm":
+
         model = LGBMRegressor(
             n_estimators=300,
             learning_rate=0.1,
             random_state=42,
+            n_jobs=-1,
         )
 
     else:
-        raise ValueError(f"Unknown model: {model_name}")
+        raise ValueError(
+            f"Unknown model: {model_name}"
+        )
 
-    return Pipeline(
+    pipeline = Pipeline(
         [
-            ("imputer", SimpleImputer(strategy="most_frequent")),
-            ("model", model),
+            (
+                "imputer",
+                SimpleImputer(
+                    strategy="most_frequent"
+                ),
+            ),
+            (
+                "model",
+                model,
+            ),
         ]
     )
 
+    return pipeline
 
-def main():
-    mlflow.set_experiment("taxi-fare-prediction")
 
-    engine = create_engine(DATABASE_URL)
+def prepare_data(df):
 
-    print("Loading training data...")
-
-    # Sample for classical models
-    if MODEL_NAME in ("linear", "rf"):
-        query = """
-        SELECT *
-        FROM training_data
-        TABLESAMPLE SYSTEM (10)
-        """
-    else:
-        query = "SELECT * FROM training_data"
-
-    df = pd.read_sql(query, engine)
-
-    X = df[
-        [
-            "passenger_count",
-            "pickup_location_id",
-            "dropoff_location_id",
-            "pickup_hour",
-            "pickup_day_of_week",
-            "pickup_month",
-            "trip_distance",
-        ]
+    features = [
+        "passenger_count",
+        "pickup_location_id",
+        "dropoff_location_id",
+        "pickup_hour",
+        "pickup_day_of_week",
+        "pickup_month",
+        "trip_distance",
     ]
 
-    y = df["fare_amount"]
+    target = "trip_duration_minutes"
 
-    X_train, X_test, y_train, y_test = train_test_split(
+    X = df[features]
+
+    y = df[target]
+
+    return train_test_split(
         X,
         y,
         test_size=0.2,
         random_state=42,
     )
 
-    pipeline = get_pipeline(MODEL_NAME)
 
-    with mlflow.start_run(run_name=MODEL_NAME) as run:
+def evaluate(model, X_test, y_test):
+
+    predictions = model.predict(X_test)
+
+    mae = mean_absolute_error(
+        y_test,
+        predictions,
+    )
+
+    rmse = mean_squared_error(
+        y_test,
+        predictions,
+        squared=False,
+    )
+
+    r2 = r2_score(
+        y_test,
+        predictions,
+    )
+
+    return {
+        "mae": mae,
+        "rmse": rmse,
+        "r2": r2,
+    }
+
+
+def main():
+
+    args = parse_args()
+
+    model_name = args.model
+
+    print(
+        f"Training model: {model_name}"
+    )
+
+    # MLflow setup
+
+    mlflow.set_tracking_uri(
+        MLFLOW_TRACKING_URI
+    )
+
+    mlflow.set_experiment(
+        EXPERIMENT_NAME
+    )
+
+    df = load_data()
+
+    (
+        X_train,
+        X_test,
+        y_train,
+        y_test,
+    ) = prepare_data(df)
+
+    pipeline = get_pipeline(
+        model_name
+    )
+
+    with mlflow.start_run(
+        run_name=model_name
+    ):
 
         start = time.time()
 
-        pipeline.fit(X_train, y_train)
+        pipeline.fit(
+            X_train,
+            y_train,
+        )
 
-        train_time = time.time() - start
+        training_time = (
+            time.time() - start
+        )
 
-        predictions = pipeline.predict(X_test)
+        metrics = evaluate(
+            pipeline,
+            X_test,
+            y_test,
+        )
 
-        mae = mean_absolute_error(y_test, predictions)
-        rmse = mean_squared_error(y_test, predictions) ** 0.5
-        r2 = r2_score(y_test, predictions)
+        print("\nResults")
 
-        print(f"MAE : {mae:.2f}")
-        print(f"RMSE: {rmse:.2f}")
-        print(f"R²  : {r2:.4f}")
+        print(
+            f"MAE : {metrics['mae']:.2f}"
+        )
 
-        # Parameters
-        mlflow.log_param("model", MODEL_NAME)
-        mlflow.log_param("rows", len(df))
+        print(
+            f"RMSE: {metrics['rmse']:.2f}"
+        )
 
-        if hasattr(pipeline.named_steps["model"], "get_params"):
-            mlflow.log_params(pipeline.named_steps["model"].get_params())
+        print(
+            f"R²  : {metrics['r2']:.4f}"
+        )
 
-        # Metrics
-        mlflow.log_metric("mae", mae)
-        mlflow.log_metric("rmse", rmse)
-        mlflow.log_metric("r2", r2)
-        mlflow.log_metric("training_time_seconds", train_time)
+        mlflow.log_param(
+            "model",
+            model_name,
+        )
 
-        # Save model artifact
+        mlflow.log_param(
+            "rows",
+            len(df),
+        )
+
+        mlflow.log_metric(
+            "mae",
+            metrics["mae"],
+        )
+
+        mlflow.log_metric(
+            "rmse",
+            metrics["rmse"],
+        )
+
+        mlflow.log_metric(
+            "r2",
+            metrics["r2"],
+        )
+
+        mlflow.log_metric(
+            "training_seconds",
+            training_time,
+        )
+
         mlflow.sklearn.log_model(
-            sk_model=pipeline,
+            pipeline,
             artifact_path="model",
+            registered_model_name=REGISTERED_MODEL_NAME,
         )
 
-        # Register model in MLflow Model Registry
-        model_uri = f"runs:/{run.info.run_id}/model"
-
-        registered_model = mlflow.register_model(
-            model_uri=model_uri,
-            name="taxi-fare-predictor",
+        print(
+            "Model logged to MLflow"
         )
-
-        print(f"\nRegistered model: {registered_model.name}")
-        print(f"Version: {registered_model.version}")
 
 
 if __name__ == "__main__":
