@@ -1,383 +1,713 @@
-# Logistics ML Platform - Handoff
+# Logistics ML Platform – Handoff
 
-## Goal
+## Current Goal
 
-Build a production-style logistics ML platform inspired by a Just Eat Takeaway ML Engineer stack.
+Build a production-style ML platform similar to what companies like JET Germany would operate.
 
-Target technologies:
+The focus is **not** just training a model, but building the surrounding platform:
 
-- Python
-- uv
-- PostgreSQL
-- SQLAlchemy
-- Alembic
-- LightGBM
-- XGBoost
-- MLflow
-- Kafka
-- Flink
-- FastAPI
-- Kubernetes
+* ETL
+* PostgreSQL
+* Feature Engineering
+* Model Training
+* MLflow
+* FastAPI Serving
+* Airflow
+* Streaming
+* Kubernetes
 
+---
 
-# Current Status
+# Current Architecture
 
-## Development Environment
-
-Running inside:
-
+```
+Developer
+    │
+    ▼
 VS Code Dev Container
+    │
+    ▼
+Docker Engine
+    │
+    ├── postgres
+    ├── mlflow
+    ├── etl
+    └── training
+```
 
-Project:
+Current repository:
 
-/workspaces/logistics-ml-platform
+```
+docker/
+    postgres/
+    mlflow/
+    etl/
+    training/
 
-Python:
+src/
+    logistics_ml/
 
-3.12.13
+data/
+notebooks/
+tests/
+scripts/
 
-Package manager:
-
-uv
-
-
-# Project Structure
-
-Current:
-
-logistics-ml-platform/
-
-├── .devcontainer/
-│   ├── devcontainer.json
-│   ├── Dockerfile
-│   └── postCreate.sh
-│
-├── data/
-│   └── raw/
-│
-├── k8s/
-│
-├── scripts/
-│
-├── src/
-│
-├── tests/
-│
-├── pyproject.toml
-└── uv.lock
-
-
-# Kubernetes Setup
-
-## Kind Cluster
-
-Created:
-
-logistics-ml
-
-Verify:
-
-kubectl get nodes
-
-Result:
-
-NAME                         STATUS
-logistics-ml-control-plane   Ready
-
-
-# Kubernetes Networking Fix
-
-Problem:
-
-kubeconfig pointed to:
-
-https://host.docker.internal:37709
-
-Inside Linux dev container:
-
-host.docker.internal was unavailable.
-
-Fixed:
-
-Replace:
-
-host.docker.internal
-
-with:
-
-172.18.0.1
-
-
-Verify:
-
-kubectl get nodes
-
-
-# PostgreSQL Deployment
-
-## Namespace
-
-Created:
-
-kubectl create namespace database
-
-
-Verify:
-
-kubectl get ns
-
+docker-compose.yml
+Makefile
+```
 
 ---
 
-## PostgreSQL Secret
+# Dataset
 
-File:
+NYC Taxi January 2024
 
-k8s/postgres-secret.yaml
+Target:
 
+```
+trip_duration_minutes
+```
 
-Contains:
+Features:
 
-DATABASE=logistics
-USER=logistics
-PASSWORD=logistics
+* passenger_count
+* pickup_location_id
+* dropoff_location_id
+* pickup_hour
+* pickup_day_of_week
+* pickup_month
+* trip_distance
 
+Rows:
 
-Applied:
+```
+8,938,099
+```
 
-kubectl apply -f k8s/postgres-secret.yaml
+Average duration
 
+```
+14.95 minutes
+```
 
 ---
 
-## Persistent Storage
+# Models Tested
 
-File:
+## Linear Regression
 
-k8s/postgres-pvc.yaml
+MAE
 
+```
+2.56
+```
 
-Storage:
+RMSE
 
-10Gi
+```
+5.25
+```
 
+R²
 
-Storage class:
+```
+0.9069
+```
 
-standard
+---
 
-rancher.io/local-path
+## Random Forest
 
+MAE
 
-Initial state:
+```
+1.97
+```
 
-Pending
+RMSE
+
+```
+4.35
+```
+
+R²
+
+```
+0.9363
+```
+
+Too memory intensive.
+
+Crashes the training instance.
+
+Not chosen.
+
+---
+
+## XGBoost
+
+MAE
+
+```
+1.99
+```
+
+RMSE
+
+```
+4.92
+```
+
+R²
+
+```
+0.9184
+```
+
+Chosen.
 
 Reason:
 
-WaitForFirstConsumer
-
-
-Expected behavior.
-
-PVC binds after pod creation.
-
+* much faster
+* scalable
+* production friendly
 
 ---
 
-## PostgreSQL Deployment
+## LightGBM
 
-File:
+MAE
 
-k8s/postgres-deployment.yaml
+```
+1.97
+```
 
+RMSE
 
-Image:
+```
+4.79
+```
 
-postgres:17
+R²
 
+```
+0.9226
+```
 
-Configuration:
+Very close to XGBoost.
 
-- 1 replica
-- Persistent volume
-- Readiness probe
-- Liveness probe
-- Resource requests
-- Resource limits
-
-
-Resources:
-
-requests:
-  cpu: 250m
-  memory: 512Mi
-
-limits:
-  cpu: 1000m
-  memory: 1Gi
-
-
-Applied:
-
-kubectl apply -f k8s/postgres-deployment.yaml
-
-
-Status:
-
-deployment "postgres" successfully rolled out
-
+Will revisit later if needed.
 
 ---
 
-## PostgreSQL Service
+# Why XGBoost
 
-File:
+Although RF scored slightly higher,
 
-k8s/postgres-service.yaml
+XGBoost trains significantly faster and is much more realistic for production.
 
+Current platform uses
 
-Service:
+```
+XGBRegressor
+```
 
+---
+
+# MLflow
+
+MLflow is no longer running inside the development environment.
+
+It has its own container.
+
+Current architecture:
+
+```
 postgres
+↓
 
+mlflow server
 
-Namespace:
+↓
 
-database
+training container
+```
 
+Training logs:
 
-Type:
+* parameters
+* metrics
+* artifacts
 
-ClusterIP
-
-
-Port:
-
-5432
-
-
-Verify:
-
-kubectl get svc -n database
-
-
-Current:
-
-postgres   ClusterIP   10.96.216.47   5432/TCP
-
+to the MLflow server.
 
 ---
 
-# PostgreSQL Verification
+# PostgreSQL
 
-Connected:
+Current databases
 
-kubectl exec -it -n database deployment/postgres -- psql -U logistics -d logistics
+```
+logistics
+mlflow
+```
 
+Both created successfully.
+
+---
+
+# Docker Containers
+
+## postgres
+
+Owns
+
+* logistics database
+* mlflow database
+
+---
+
+## mlflow
+
+Owns
+
+* experiment tracking
+* model registry
+* artifacts
+
+Runs on
+
+```
+5000
+```
+
+Backend
+
+```
+postgresql+psycopg://logistics:logistics@postgres:5432/mlflow
+```
+
+Artifact root
+
+```
+/mlflow/artifacts
+```
+
+---
+
+## etl
+
+Responsible for
+
+* loading parquet
+* preprocessing
+* loading PostgreSQL
+
+---
+
+## training
+
+Responsible for
+
+* reading training_data
+* training model
+* logging MLflow
+
+---
+
+# Current Compose
+
+Services
+
+```
+postgres
+mlflow
+etl
+training
+```
+
+Persistent volumes
+
+```
+postgres_data
+mlflow_artifacts
+```
+
+---
+
+# Makefile
+
+Target direction
+
+```
+make build
+
+make up
+
+make load
+
+make train
+
+make down
+```
+
+Goal
+
+```
+git clone
+
+make up
+
+make load
+
+make train
+```
+
+Nothing else.
+
+---
+
+# Important Docker Decision
+
+During development
+
+DO NOT copy Python files into the image every edit.
+
+Instead
+
+mount the repository.
+
+Reason
+
+Image
+
+contains
+
+* Python
+* libraries
+* dependencies
+
+Repository mount
+
+contains
+
+live source code.
+
+Editing
+
+```
+train.py
+```
+
+should never require rebuilding the image.
+
+Only changes to
+
+* Dockerfile
+* requirements.txt
+* system libraries
+
+should require
+
+```
+docker compose build
+```
+
+---
+
+# Repository Refactor Started
+
+Created
+
+```
+src/logistics_ml/
+```
+
+Current plan
+
+```
+config.py
+
+db.py
+
+models.py
+
+features.py
+
+utils.py
+```
+
+---
+
+## config.py
+
+Single source of truth
+
+Contains
+
+```
+DATABASE_URL
+
+MLFLOW_TRACKING_URI
+
+RANDOM_STATE
+```
+
+---
+
+## db.py
+
+Contains
+
+```
+engine = create_engine(...)
+```
+
+Every module imports
+
+```
+from logistics_ml.db import engine
+```
+
+No duplicated database code.
+
+---
+
+# Training Refactor
+
+Goal
+
+train.py should only orchestrate
+
+1. parse args
+
+2. load data
+
+3. get pipeline
+
+4. fit
+
+5. evaluate
+
+6. log MLflow
+
+Business logic moves into
+
+```
+src/logistics_ml
+```
+
+---
+
+# Dev Container
+
+Uses Docker Outside Docker.
+
+Current issue
+
+MLflow is healthy.
 
 Verified:
 
-SELECT version();
+* container running
+* database connected
+* Docker network reachable
+* HTTP returns 200 inside container network
+
+Remaining issue
+
+VS Code Dev Container port forwarding.
+
+Need to add
+
+```
+forwardPorts
+
+5000
+
+5432
+```
+
+to
+
+```
+.devcontainer/devcontainer.json
+```
+
+then rebuild the Dev Container.
+
+Infrastructure itself is healthy.
+
+---
+
+# Important Decision
+
+Do NOT install MLflow inside the development environment.
+
+Training should always execute inside
+
+```
+training container
+```
+
+Reason
+
+Avoid dependency conflicts involving
+
+* pandas
+* pyarrow
+* MLflow
+* uv
+
+Each container owns its dependencies.
+
+---
+
+# Desired Future Layout
+
+```
+docker/
+
+    postgres/
+
+    mlflow/
+
+    etl/
+
+    training/
 
 
-Result:
+src/
 
-PostgreSQL 17.10
-aarch64
+    logistics_ml/
 
+        config.py
 
-Database currently empty:
+        db.py
 
-\dt
+        models.py
 
+        features.py
 
-Result:
+        training.py
 
-Did not find any relations.
+        serving.py
 
-
-# Next Task
-
-## SQLAlchemy + Alembic Setup
+        utils.py
 
 
-Install:
+tests/
 
-uv add sqlalchemy alembic psycopg[binary]
+data/
 
+notebooks/
 
-Initialize:
+docker-compose.yml
 
-uv run alembic init alembic
+Makefile
+```
 
+Eventually
 
-Next steps:
+```
+docker/training/train.py
+```
 
-1. Create SQLAlchemy models.
-2. Configure Alembic connection.
-3. Create first migration.
-4. Apply schema to PostgreSQL.
-5. Load taxi dataset.
-6. Build SQL feature engineering pipeline.
-7. Train LightGBM/XGBoost.
-8. Add MLflow.
-9. Add Kafka.
-10. Add Flink.
-11. Deploy services to Kubernetes.
+should become
 
+```
+python -m logistics_ml.training
+```
 
-# Final Architecture
+leaving Dockerfiles responsible only for infrastructure.
 
-Taxi Dataset
+---
 
-        |
-        v
+# Remaining Work
 
-PostgreSQL
+## Infrastructure
 
-        |
-        v
+* Finish repository cleanup
+* Move reusable code into src/logistics_ml
+* Fix Dev Container port forwarding
+* Remove duplicate training scripts
 
-SQL Feature Engineering
+---
 
-        |
-        v
+## Data
 
-LightGBM / XGBoost
+* Automate schema creation
+* Make ETL completely reproducible
 
-        |
-        v
+---
 
-MLflow
+## ML
 
-        |
-        v
+* Feature engineering
+* Hyperparameter tuning
+* Feature importance
+* SHAP analysis
+
+---
+
+## Platform
+
+Implement
 
 FastAPI
 
-        |
-        v
+↓
 
-Kafka
+Batch inference
 
-        |
-        v
+↓
 
-Flink
+MLflow Model Registry
 
-        |
-        v
+↓
 
+Airflow
+
+↓
+
+Streaming (Kafka/Flink)
+
+↓
+
+Monitoring
+
+↓
+
+Kubernetes deployment
+
+---
+
+# Long-Term Vision
+
+The objective is to finish with a platform that resembles a production ML system:
+
+```
+ETL
+    ↓
+PostgreSQL
+    ↓
+Feature Engineering
+    ↓
+Training
+    ↓
+MLflow
+    ↓
+Model Registry
+    ↓
+FastAPI
+    ↓
+Batch Predictions
+    ↓
+Streaming Predictions
+    ↓
+Monitoring
+    ↓
 Kubernetes
+```
 
-
-# Resume Point
-
-Start next session with:
-
-uv add sqlalchemy alembic psycopg[binary]
-
-Then:
-
-uv run alembic init alembic
+The emphasis is on demonstrating production ML engineering practices rather than only achieving the highest predictive accuracy.

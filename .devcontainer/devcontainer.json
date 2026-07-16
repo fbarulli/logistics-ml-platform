@@ -1,19 +1,30 @@
 {
   "name": "Logistics ML Platform",
-
   "build": {
     "dockerfile": "Dockerfile",
     "context": ".."
   },
-
   "features": {
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
-
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached"
+  ],
+  "workspaceFolder": "/workspace",
+  "forwardPorts": [
+    5000,
+    5432
+  ],
+  "portsAttributes": {
+    "5000": {
+      "label": "MLflow"
+    },
+    "5432": {
+      "label": "PostgreSQL"
+    }
+  },
   "remoteUser": "vscode",
-
   "postCreateCommand": "bash .devcontainer/postCreate.sh",
-
   "customizations": {
     "vscode": {
       "settings": {

@@ -1,21 +1,33 @@
 services:
-
   postgres:
     image: postgres:16
     container_name: logistics-postgres
     environment:
       POSTGRES_USER: logistics
       POSTGRES_PASSWORD: logistics
-      POSTGRES_DB: logistics
+      POSTGRES_DB: postgres
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
-
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+  api:
+    build:
+      context: .
+      dockerfile: service/Dockerfile
+    container_name: taxi-api
+    depends_on:
+      - mlflow
+      - postgres
+    ports:
+      - "8000:8000"
+    volumes:
+    - .:/workspace
+    - mlflow_artifacts:/mlflow/artifacts
   mlflow:
     build:
-      context: ./mlflow
+      context: .
+      dockerfile: docker/mlflow/Dockerfile
     container_name: mlflow-server
     depends_on:
       - postgres
@@ -24,18 +36,32 @@ services:
     volumes:
       - mlflow_artifacts:/mlflow/artifacts
 
+  etl:
+    build:
+      context: .
+      dockerfile: docker/etl/Dockerfile
+    container_name: taxi-etl
+    depends_on:
+      - postgres
+    volumes:
+      - .:/workspace
+
+    working_dir: /workspace
+    command: python -m logistics_ml.etl.run
 
   training:
     build:
-      context: ./training
+      context: .
+      dockerfile: docker/training/Dockerfile
     container_name: taxi-training
     depends_on:
       - postgres
       - mlflow
-
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    command: python -m logistics_ml.training
 
 volumes:
-
   postgres_data:
-
   mlflow_artifacts:
