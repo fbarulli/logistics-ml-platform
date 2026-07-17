@@ -24,6 +24,11 @@ services:
     volumes:
     - .:/workspace
     - mlflow_artifacts:/mlflow/artifacts
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
   mlflow:
     build:
       context: .
@@ -60,8 +65,14 @@ services:
     working_dir: /workspace
     volumes:
       - .:/workspace
+      - mlflow_artifacts:/mlflow/artifacts
     command: python -m logistics_ml.training
 
 volumes:
   postgres_data:
+
   mlflow_artifacts:
+    external: true
+    name: logistics-ml-platform_mlflow_artifacts
+
+

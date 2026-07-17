@@ -1,3 +1,5 @@
+import traceback
+
 import mlflow
 import mlflow.sklearn
 from mlflow.tracking import MlflowClient
@@ -5,24 +7,16 @@ from mlflow.tracking import MlflowClient
 
 def setup_mlflow(experiment_name):
     print("=== MLFLOW SETUP ===")
-
     mlflow.set_tracking_uri("http://mlflow:5000")
-
-    print("Tracking URI:")
-    print(mlflow.get_tracking_uri())
+    mlflow.set_registry_uri("http://mlflow:5000")
+    print("Tracking URI:", mlflow.get_tracking_uri())
+    print("Registry URI:", mlflow.get_registry_uri())
 
     experiment = mlflow.set_experiment(experiment_name)
-
-    print("Experiment:")
-    print(experiment.name)
-    print("Experiment ID:")
-    print(experiment.experiment_id)
+    print("Experiment ID:", experiment.experiment_id)
 
     run = mlflow.start_run()
-
-    print("Started run:")
-    print(run.info.run_id)
-
+    print("Run ID:", run.info.run_id)
     return run.info.run_id
 
 
@@ -38,26 +32,12 @@ def log_metrics(model_name, rows, training_time, metrics):
         print("Run ID:")
         print(run.info.run_id)
 
-    mlflow.log_param(
-        "model",
-        model_name,
-    )
-
-    mlflow.log_param(
-        "rows",
-        rows,
-    )
-
-    mlflow.log_metric(
-        "training_time",
-        training_time,
-    )
+    mlflow.log_param("model", model_name)
+    mlflow.log_param("rows", rows)
+    mlflow.log_metric("training_time", training_time)
 
     for key, value in metrics.items():
-        mlflow.log_metric(
-            key,
-            float(value),
-        )
+        mlflow.log_metric(key, float(value))
 
     print("Metrics logged")
 
@@ -74,21 +54,29 @@ def log_model(model, model_name):
         print("Run ID:")
         print(run.info.run_id)
 
-        print("Artifact URI:")
+        print("Artifact URI (active run):")
         print(run.info.artifact_uri)
+
+        print("mlflow.get_artifact_uri():")
+        print(mlflow.get_artifact_uri())
 
     print("Logging model...")
 
-    model_info = mlflow.sklearn.log_model(
-        sk_model=model,
-        name="model",
-        registered_model_name=model_name,
-        skops_trusted_types=[
-            "numpy.dtype",
-            "xgboost.core.Booster",
-            "xgboost.sklearn.XGBRegressor",
-        ],
-    )
+    try:
+        model_info = mlflow.sklearn.log_model(
+            sk_model=model,
+            name="model",
+            registered_model_name=model_name,
+            skops_trusted_types=[
+                "numpy.dtype",
+                "xgboost.core.Booster",
+                "xgboost.sklearn.XGBRegressor",
+            ],
+        )
+    except Exception:
+        print("\n=== log_model() EXCEPTION ===")
+        traceback.print_exc()
+        raise
 
     print("Model logged")
 
@@ -100,21 +88,29 @@ def log_model(model, model_name):
     if run:
         client = MlflowClient()
 
-        artifacts = client.list_artifacts(
-            run.info.run_id
-        )
+        refreshed_run = client.get_run(run.info.run_id)
 
-        for artifact in artifacts:
-            print(
-                "Artifact:",
-                artifact.path,
-                "Directory:",
-                artifact.is_dir,
-            )
+        print("Stored artifact URI:")
+        print(refreshed_run.info.artifact_uri)
+
+        try:
+            artifacts = client.list_artifacts(run.info.run_id)
+
+            if artifacts:
+                for artifact in artifacts:
+                    print(
+                        "Artifact:",
+                        artifact.path,
+                        "Directory:",
+                        artifact.is_dir,
+                    )
+            else:
+                print("No artifacts returned by list_artifacts().")
+        except Exception:
+            print("\n=== list_artifacts() EXCEPTION ===")
+            traceback.print_exc()
 
     print("=== VERIFY REGISTERED MODEL ===")
-
-    client = MlflowClient()
 
     versions = client.search_model_versions(
         f"name='{model_name}'"

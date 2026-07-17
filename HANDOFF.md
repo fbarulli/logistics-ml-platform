@@ -1,713 +1,302 @@
-# Logistics ML Platform – Handoff
+# ML Platform Handoff
 
-## Current Goal
+## Current Status
 
-Build a production-style ML platform similar to what companies like JET Germany would operate.
+### ✅ PostgreSQL
 
-The focus is **not** just training a model, but building the surrounding platform:
+The MLflow database schema has been corrected and now matches MLflow 3.14.0.
 
-* ETL
-* PostgreSQL
-* Feature Engineering
-* Model Training
-* MLflow
-* FastAPI Serving
-* Airflow
-* Streaming
-* Kubernetes
-
----
-
-# Current Architecture
-
-```
-Developer
-    │
-    ▼
-VS Code Dev Container
-    │
-    ▼
-Docker Engine
-    │
-    ├── postgres
-    ├── mlflow
-    ├── etl
-    └── training
+```sql
+SELECT version_num FROM alembic_version;
 ```
 
-Current repository:
+Returns:
 
 ```
-docker/
-    postgres/
-    mlflow/
-    etl/
-    training/
+b7e4c1a90f23
+```
 
-src/
-    logistics_ml/
+The relevant schema is now:
 
-data/
-notebooks/
-tests/
-scripts/
+```sql
+model_versions.version      -> character varying
+model_version_tags.version  -> character varying
+```
 
-docker-compose.yml
-Makefile
+Both the MLflow server and training container are running:
+
+```
+mlflow==3.14.0
 ```
 
 ---
 
-# Dataset
+## MLflow
 
-NYC Taxi January 2024
+Training succeeds.
 
-Target:
-
-```
-trip_duration_minutes
-```
-
-Features:
-
-* passenger_count
-* pickup_location_id
-* dropoff_location_id
-* pickup_hour
-* pickup_day_of_week
-* pickup_month
-* trip_distance
-
-Rows:
+Example output:
 
 ```
-8,938,099
+Started run:
+e8c184dbb671420e8e1fcad47b934889
+
+Created version '2' of model 'taxi-duration-model'
+
+Model URI:
+models:/m-2e8f26e3f6b748dea49d713577aa1f5b
 ```
 
-Average duration
+The registry contains:
 
 ```
-14.95 minutes
+taxi-duration-model
+├── version 1
+└── version 2
+```
+
+Verified using:
+
+```python
+from mlflow.tracking import MlflowClient
+
+client = MlflowClient()
+
+for mv in client.search_model_versions("name='taxi-duration-model'"):
+    print(mv.name, mv.version, mv.status, mv.run_id)
+```
+
+This works inside the MLflow container.
+
+---
+
+## Registry Issue (Resolved)
+
+Originally every registry lookup failed with:
+
+```
+operator does not exist:
+integer = character varying
+```
+
+This was caused by an outdated database schema.
+
+After fixing the schema, model registration and registry queries now work correctly.
+
+Training successfully registers new model versions.
+
+---
+
+## Current Blocker
+
+The API no longer fails because of the registry.
+
+It now fails while loading artifacts.
+
+Current error:
+
+```
+MlflowException:
+
+Could not find an "MLmodel" configuration file at
+
+/tmp/tmpxxxx/model/MLmodel
+```
+
+This occurs when attempting to load:
+
+```python
+runs:/e8c184dbb671420e8e1fcad47b934889/model
+```
+
+The same issue ultimately prevents:
+
+```python
+models:/taxi-duration-model/2
+```
+
+from working.
+
+---
+
+## Current Serving Code
+
+Temporary debugging version:
+
+```python
+mlflow.set_tracking_uri("http://mlflow:5000")
+
+model_uri = "runs:/e8c184dbb671420e8e1fcad47b934889/model"
+
+model = mlflow.pyfunc.load_model(model_uri)
+```
+
+Eventually this should become:
+
+```python
+model_uri = "models:/taxi-duration-model/2"
 ```
 
 ---
 
-# Models Tested
+## Important Discovery
 
-## Linear Regression
+Inside the API container:
 
-MAE
-
-```
-2.56
+```bash
+find /mlflow/artifacts/1/e8c184dbb671420e8e1fcad47b934889
 ```
 
-RMSE
+returns:
 
 ```
-5.25
+No such file or directory
 ```
 
-R²
+This strongly suggests one of the following:
 
-```
-0.9069
-```
+- the artifacts were never written
+- the API is mounting a different Docker volume
+- MLflow is serving artifacts from another backend
+- the model artifact path differs from what the API expects
 
 ---
 
-## Random Forest
+## Docker Compose
 
-MAE
-
-```
-1.97
-```
-
-RMSE
+MLflow server starts with:
 
 ```
-4.35
-```
-
-R²
-
-```
-0.9363
-```
-
-Too memory intensive.
-
-Crashes the training instance.
-
-Not chosen.
-
----
-
-## XGBoost
-
-MAE
-
-```
-1.99
-```
-
-RMSE
-
-```
-4.92
-```
-
-R²
-
-```
-0.9184
-```
-
-Chosen.
-
-Reason:
-
-* much faster
-* scalable
-* production friendly
-
----
-
-## LightGBM
-
-MAE
-
-```
-1.97
-```
-
-RMSE
-
-```
-4.79
-```
-
-R²
-
-```
-0.9226
-```
-
-Very close to XGBoost.
-
-Will revisit later if needed.
-
----
-
-# Why XGBoost
-
-Although RF scored slightly higher,
-
-XGBoost trains significantly faster and is much more realistic for production.
-
-Current platform uses
-
-```
-XGBRegressor
-```
-
----
-
-# MLflow
-
-MLflow is no longer running inside the development environment.
-
-It has its own container.
-
-Current architecture:
-
-```
-postgres
-↓
-
-mlflow server
-
-↓
-
-training container
-```
-
-Training logs:
-
-* parameters
-* metrics
-* artifacts
-
-to the MLflow server.
-
----
-
-# PostgreSQL
-
-Current databases
-
-```
-logistics
-mlflow
-```
-
-Both created successfully.
-
----
-
-# Docker Containers
-
-## postgres
-
-Owns
-
-* logistics database
-* mlflow database
-
----
-
-## mlflow
-
-Owns
-
-* experiment tracking
-* model registry
-* artifacts
-
-Runs on
-
-```
-5000
-```
-
-Backend
-
-```
+--backend-store-uri
 postgresql+psycopg://logistics:logistics@postgres:5432/mlflow
+
+--default-artifact-root
+/mlflow/artifacts
 ```
 
-Artifact root
+API currently mounts:
+
+```yaml
+volumes:
+  - .:/workspace
+  - mlflow_artifacts:/mlflow/artifacts
+```
+
+Need to verify that this is the exact same Docker volume mounted by the MLflow server.
+
+---
+
+## Things Already Verified
+
+✅ PostgreSQL is healthy
+
+✅ MLflow server is healthy
+
+✅ Training logs metrics
+
+✅ Training logs models
+
+✅ Model registry creates new versions
+
+✅ Registry queries succeed inside the MLflow container
+
+✅ API reaches the MLflow server
+
+✅ API reaches the registry
+
+❌ API cannot load model artifacts
+
+---
+
+## Next Debugging Steps
+
+### 1. Verify artifacts actually exist
+
+Inside the MLflow container:
+
+```bash
+find /mlflow/artifacts -name MLmodel
+```
+
+If no MLmodel files exist anywhere, then training never persisted artifacts.
+
+---
+
+### 2. Compare Docker mounts
+
+Inspect both containers:
+
+```bash
+docker inspect mlflow-server
+docker inspect taxi-api
+```
+
+Compare:
+
+```
+Mounts
+```
+
+for:
 
 ```
 /mlflow/artifacts
 ```
 
----
-
-## etl
-
-Responsible for
-
-* loading parquet
-* preprocessing
-* loading PostgreSQL
+They must point to the exact same Docker volume.
 
 ---
 
-## training
+### 3. If MLflow also lacks artifacts
 
-Responsible for
+Investigate where `log_model()` actually writes the model.
 
-* reading training_data
-* training model
-* logging MLflow
+Print:
+
+```python
+mlflow.get_artifact_uri()
+```
+
+after logging.
 
 ---
 
-# Current Compose
+### 4. If MLflow has artifacts but API does not
 
-Services
-
-```
-postgres
-mlflow
-etl
-training
-```
-
-Persistent volumes
-
-```
-postgres_data
-mlflow_artifacts
-```
+Fix the shared Docker volume configuration.
 
 ---
 
-# Makefile
+### 5. Restore normal serving
 
-Target direction
+Once
 
-```
-make build
-
-make up
-
-make load
-
-make train
-
-make down
+```python
+runs:/...
 ```
 
-Goal
+loads successfully, switch back to:
 
-```
-git clone
-
-make up
-
-make load
-
-make train
+```python
+models:/taxi-duration-model/2
 ```
 
-Nothing else.
+and remove all temporary debugging code.
 
 ---
 
-# Important Docker Decision
+## Overall Assessment
 
-During development
+The original MLflow registry/database issue appears to be resolved.
 
-DO NOT copy Python files into the image every edit.
+The remaining blocker is now entirely related to artifact storage.
 
-Instead
+Model registration succeeds.
 
-mount the repository.
+The registry contains the correct model versions.
 
-Reason
+The API reaches the registry successfully.
 
-Image
+However, the API cannot locate the underlying MLmodel artifact required to load the model.
 
-contains
-
-* Python
-* libraries
-* dependencies
-
-Repository mount
-
-contains
-
-live source code.
-
-Editing
-
-```
-train.py
-```
-
-should never require rebuilding the image.
-
-Only changes to
-
-* Dockerfile
-* requirements.txt
-* system libraries
-
-should require
-
-```
-docker compose build
-```
-
----
-
-# Repository Refactor Started
-
-Created
-
-```
-src/logistics_ml/
-```
-
-Current plan
-
-```
-config.py
-
-db.py
-
-models.py
-
-features.py
-
-utils.py
-```
-
----
-
-## config.py
-
-Single source of truth
-
-Contains
-
-```
-DATABASE_URL
-
-MLFLOW_TRACKING_URI
-
-RANDOM_STATE
-```
-
----
-
-## db.py
-
-Contains
-
-```
-engine = create_engine(...)
-```
-
-Every module imports
-
-```
-from logistics_ml.db import engine
-```
-
-No duplicated database code.
-
----
-
-# Training Refactor
-
-Goal
-
-train.py should only orchestrate
-
-1. parse args
-
-2. load data
-
-3. get pipeline
-
-4. fit
-
-5. evaluate
-
-6. log MLflow
-
-Business logic moves into
-
-```
-src/logistics_ml
-```
-
----
-
-# Dev Container
-
-Uses Docker Outside Docker.
-
-Current issue
-
-MLflow is healthy.
-
-Verified:
-
-* container running
-* database connected
-* Docker network reachable
-* HTTP returns 200 inside container network
-
-Remaining issue
-
-VS Code Dev Container port forwarding.
-
-Need to add
-
-```
-forwardPorts
-
-5000
-
-5432
-```
-
-to
-
-```
-.devcontainer/devcontainer.json
-```
-
-then rebuild the Dev Container.
-
-Infrastructure itself is healthy.
-
----
-
-# Important Decision
-
-Do NOT install MLflow inside the development environment.
-
-Training should always execute inside
-
-```
-training container
-```
-
-Reason
-
-Avoid dependency conflicts involving
-
-* pandas
-* pyarrow
-* MLflow
-* uv
-
-Each container owns its dependencies.
-
----
-
-# Desired Future Layout
-
-```
-docker/
-
-    postgres/
-
-    mlflow/
-
-    etl/
-
-    training/
-
-
-src/
-
-    logistics_ml/
-
-        config.py
-
-        db.py
-
-        models.py
-
-        features.py
-
-        training.py
-
-        serving.py
-
-        utils.py
-
-
-tests/
-
-data/
-
-notebooks/
-
-docker-compose.yml
-
-Makefile
-```
-
-Eventually
-
-```
-docker/training/train.py
-```
-
-should become
-
-```
-python -m logistics_ml.training
-```
-
-leaving Dockerfiles responsible only for infrastructure.
-
----
-
-# Remaining Work
-
-## Infrastructure
-
-* Finish repository cleanup
-* Move reusable code into src/logistics_ml
-* Fix Dev Container port forwarding
-* Remove duplicate training scripts
-
----
-
-## Data
-
-* Automate schema creation
-* Make ETL completely reproducible
-
----
-
-## ML
-
-* Feature engineering
-* Hyperparameter tuning
-* Feature importance
-* SHAP analysis
-
----
-
-## Platform
-
-Implement
-
-FastAPI
-
-↓
-
-Batch inference
-
-↓
-
-MLflow Model Registry
-
-↓
-
-Airflow
-
-↓
-
-Streaming (Kafka/Flink)
-
-↓
-
-Monitoring
-
-↓
-
-Kubernetes deployment
-
----
-
-# Long-Term Vision
-
-The objective is to finish with a platform that resembles a production ML system:
-
-```
-ETL
-    ↓
-PostgreSQL
-    ↓
-Feature Engineering
-    ↓
-Training
-    ↓
-MLflow
-    ↓
-Model Registry
-    ↓
-FastAPI
-    ↓
-Batch Predictions
-    ↓
-Streaming Predictions
-    ↓
-Monitoring
-    ↓
-Kubernetes
-```
-
-The emphasis is on demonstrating production ML engineering practices rather than only achieving the highest predictive accuracy.
+The investigation should now focus exclusively on artifact storage, Docker volumes, and MLflow artifact paths rather than PostgreSQL or the model registry.
