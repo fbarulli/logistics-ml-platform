@@ -9,3 +9,5 @@ data/
 
 # Virtual environments
 .venv
+mlflow.db
+docker-compose.yml.bak
