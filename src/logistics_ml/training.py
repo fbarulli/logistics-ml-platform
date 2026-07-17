@@ -107,7 +107,13 @@ def main():
         version=version,
     )
 
-    print("\n=== TRAINING COMPLETE ===")
+    client.set_registered_model_alias(
+        name="taxi-duration-model",
+        alias="champion",
+        version=version,
+    )
+
+    print("=== TRAINING COMPLETE ===")
     print(f"Model URI: {model_uri}")
     print(f"Champion version: {version}")
 
