@@ -1344,20 +1344,22 @@ class SqlAlchemyStore(AbstractStore):
     def get_model_version_download_uri(self, name, version):
         """
         Get the download location in Model Registry for this model version.
-        NOTE: For first version of Model Registry, since the models are not copied over to another
-              location, download URI points to input source path.
 
-        Args:
-            name: Registered model name.
-            version: Registered model version.
-
-        Returns:
-            A single URI location that allows reads for downloading.
+        NOTE:
+            For the first version of Model Registry, since the models are not copied
+            over to another location, download URI points to the original source path.
         """
         with self.ManagedSessionMaker() as session:
             sql_model_version = self._get_sql_model_version(
-                session, name, version)
-            return sql_model_version.storage_location or sql_model_version.source
+                session,
+                name,
+                int(version),  # <-- FIX
+            )
+
+            return (
+                sql_model_version.storage_location
+                or sql_model_version.source
+            )
 
     def search_model_versions(
         self,

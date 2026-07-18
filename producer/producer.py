@@ -1,3 +1,4 @@
+from logistics_ml.schemas.taxi import TaxiTripEvent
 import json
 import time
 import random
@@ -27,16 +28,19 @@ producer = create_producer()
 
 
 while True:
-    event = {
-        "trip_id": str(random.randint(100000, 999999)),
-        "pickup_zone": random.randint(1, 50),
-        "dropoff_zone": random.randint(1, 50),
-        "distance_km": round(random.uniform(1, 20), 2),
-        "passengers": random.randint(1, 4),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
+    event = TaxiTripEvent(
+        trip_id=str(random.randint(100000, 999999)),
+        pickup_zone=random.randint(1, 50),
+        dropoff_zone=random.randint(1, 50),
+        distance_km=round(random.uniform(1, 20), 2),
+        passengers=random.randint(1, 4),
+        timestamp=datetime.now(timezone.utc),
+    )
 
-    producer.send("taxi-trips", event)
+    producer.send(
+        "taxi-trips",
+        event.model_dump(mode="json"),
+    )
     producer.flush()
 
     print("sent:", event)
