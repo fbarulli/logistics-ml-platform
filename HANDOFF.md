@@ -1,302 +1,496 @@
-# ML Platform Handoff
+# Logistics ML Platform — Project Handoff
 
 ## Current Status
 
-### ✅ PostgreSQL
+The core end-to-end ML inference platform is operational.
 
-The MLflow database schema has been corrected and now matches MLflow 3.14.0.
-
-```sql
-SELECT version_num FROM alembic_version;
-```
-
-Returns:
+Architecture:
 
 ```
-b7e4c1a90f23
-```
-
-The relevant schema is now:
-
-```sql
-model_versions.version      -> character varying
-model_version_tags.version  -> character varying
-```
-
-Both the MLflow server and training container are running:
-
-```
-mlflow==3.14.0
+Producer
+    │
+    ▼
+Kafka (taxi-trips)
+    │
+    ▼
+Consumer
+    │
+    ▼
+FastAPI (/predict)
+    │
+    ▼
+MLflow Model Registry (Champion alias)
+    │
+    ▼
+Prediction
+    │
+    ▼
+PostgreSQL (taxi_predictions)
 ```
 
 ---
 
-## MLflow
+# Stack
 
-Training succeeds.
+- Python 3.12
+- FastAPI
+- PostgreSQL
+- Kafka
+- MLflow
+- Docker Compose
+- scikit-learn
+- XGBoost
+- SQLAlchemy
+- psycopg3
 
-Example output:
+Upcoming:
+
+- Flink SQL
+- Feast
+
+---
+
+# Current Project Structure
 
 ```
-Started run:
-e8c184dbb671420e8e1fcad47b934889
-
-Created version '2' of model 'taxi-duration-model'
-
-Model URI:
-models:/m-2e8f26e3f6b748dea49d713577aa1f5b
+.
+├── consumer/
+├── producer/
+├── service/
+├── src/logistics_ml/
+├── docker/
+├── flink/
+│   └── sql/
+└── docker-compose.yml
 ```
 
-The registry contains:
+---
+
+# Infrastructure
+
+Running services:
+
+- postgres
+- kafka
+- mlflow
+- api
+- producer
+- consumer
+
+Training and ETL are run on demand.
+
+---
+
+# Databases
+
+## logistics
+
+Contains
+
+```
+locations
+taxi_trips
+taxi_predictions
+```
+
+## mlflow
+
+Contains
+
+- experiments
+- runs
+- registered models
+- model versions
+
+---
+
+# MLflow
+
+Tracking URI
+
+```
+http://mlflow:5000
+```
+
+Registered model
 
 ```
 taxi-duration-model
-├── version 1
-└── version 2
 ```
 
-Verified using:
+Alias
 
-```python
-from mlflow.tracking import MlflowClient
-
-client = MlflowClient()
-
-for mv in client.search_model_versions("name='taxi-duration-model'"):
-    print(mv.name, mv.version, mv.status, mv.run_id)
+```
+champion
 ```
 
-This works inside the MLflow container.
+Current version
+
+```
+2
+```
+
+API loads
+
+```
+models:/taxi-duration-model@champion
+```
+
+(or resolves champion to Version 2)
 
 ---
 
-## Registry Issue (Resolved)
+# Current Pipeline
 
-Originally every registry lookup failed with:
+Producer generates events:
 
 ```
-operator does not exist:
-integer = character varying
+TaxiTripEvent
 ```
 
-This was caused by an outdated database schema.
+Schema
 
-After fixing the schema, model registration and registry queries now work correctly.
+```
+trip_id
+pickup_zone
+dropoff_zone
+distance_km
+passengers
+timestamp
+```
 
-Training successfully registers new model versions.
+Consumer
+
+- consumes Kafka
+- validates with Pydantic
+- derives model features
+- calls FastAPI
+- stores predictions
+
+API
+
+- loads champion model from MLflow
+- predicts duration
+- returns JSON
+
+Predictions stored in
+
+```
+taxi_predictions
+```
+
+Example
+
+```
+trip_id
+prediction
+created_at
+```
+
+Current row count exceeded 800+ rows.
 
 ---
 
-## Current Blocker
+# Docker Notes
 
-The API no longer fails because of the registry.
-
-It now fails while loading artifacts.
-
-Current error:
+Consumer depends on
 
 ```
-MlflowException:
-
-Could not find an "MLmodel" configuration file at
-
-/tmp/tmpxxxx/model/MLmodel
+depends_on:
+  kafka:
+    condition: service_started
+  api:
+    condition: service_healthy
 ```
 
-This occurs when attempting to load:
+API has healthcheck enabled.
 
-```python
-runs:/e8c184dbb671420e8e1fcad47b934889/model
+Producer and Consumer use
+
+```
+context: .
+dockerfile: producer/Dockerfile
+
+context: .
+dockerfile: consumer/Dockerfile
 ```
 
-The same issue ultimately prevents:
+Both mount
 
-```python
-models:/taxi-duration-model/2
+```
+.:/workspace
 ```
 
-from working.
+and use
 
----
-
-## Current Serving Code
-
-Temporary debugging version:
-
-```python
-mlflow.set_tracking_uri("http://mlflow:5000")
-
-model_uri = "runs:/e8c184dbb671420e8e1fcad47b934889/model"
-
-model = mlflow.pyfunc.load_model(model_uri)
 ```
-
-Eventually this should become:
-
-```python
-model_uri = "models:/taxi-duration-model/2"
+PYTHONPATH=/workspace/src
 ```
 
 ---
 
-## Important Discovery
+# Important Fixes Already Made
 
-Inside the API container:
+✔ PostgreSQL initialization
 
-```bash
-find /mlflow/artifacts/1/e8c184dbb671420e8e1fcad47b934889
-```
+✔ MLflow registry
 
-returns:
+✔ Champion alias
 
-```
-No such file or directory
-```
+✔ API model loading
 
-This strongly suggests one of the following:
+✔ Producer imports
 
-- the artifacts were never written
-- the API is mounting a different Docker volume
-- MLflow is serving artifacts from another backend
-- the model artifact path differs from what the API expects
+✔ Consumer imports
 
----
+✔ psycopg installation
 
-## Docker Compose
+✔ API health dependency
 
-MLflow server starts with:
+✔ Prediction persistence
 
-```
---backend-store-uri
-postgresql+psycopg://logistics:logistics@postgres:5432/mlflow
+✔ Docker build contexts
 
---default-artifact-root
-/mlflow/artifacts
-```
-
-API currently mounts:
-
-```yaml
-volumes:
-  - .:/workspace
-  - mlflow_artifacts:/mlflow/artifacts
-```
-
-Need to verify that this is the exact same Docker volume mounted by the MLflow server.
+✔ Kafka connectivity
 
 ---
 
-## Things Already Verified
+# Verified End-to-End
 
-✅ PostgreSQL is healthy
+Verified working chain:
 
-✅ MLflow server is healthy
+```
+Producer
 
-✅ Training logs metrics
+↓
 
-✅ Training logs models
+Kafka
 
-✅ Model registry creates new versions
+↓
 
-✅ Registry queries succeed inside the MLflow container
+Consumer
 
-✅ API reaches the MLflow server
+↓
 
-✅ API reaches the registry
+API
 
-❌ API cannot load model artifacts
+↓
+
+MLflow
+
+↓
+
+Prediction
+
+↓
+
+Postgres
+```
+
+Verified via
+
+```
+SELECT COUNT(*) FROM taxi_predictions;
+```
+
+and
+
+```
+SELECT *
+FROM taxi_predictions
+ORDER BY id DESC
+LIMIT 10;
+```
+
+API logs show repeated
+
+```
+POST /predict
+200 OK
+```
 
 ---
 
-## Next Debugging Steps
+# Next Phase
 
-### 1. Verify artifacts actually exist
+## Phase 1
 
-Inside the MLflow container:
+Flink SQL
 
-```bash
-find /mlflow/artifacts -name MLmodel
+Goal:
+
+Move feature engineering out of Python and into Flink.
+
+New architecture
+
+```
+Producer
+
+↓
+
+Kafka
+(taxi-trips)
+
+↓
+
+Flink SQL
+
+↓
+
+Kafka
+(taxi-features)
+
+↓
+
+Consumer
+
+↓
+
+API
+
+↓
+
+Postgres
 ```
 
-If no MLmodel files exist anywhere, then training never persisted artifacts.
+Producer remains unchanged.
+
+Consumer becomes thinner.
 
 ---
 
-### 2. Compare Docker mounts
-
-Inspect both containers:
-
-```bash
-docker inspect mlflow-server
-docker inspect taxi-api
-```
-
-Compare:
+## Planned Flink SQL Directory
 
 ```
-Mounts
+flink/sql/
+
+01-source.sql
+
+02-features.sql
+
+03-sink.sql
+
+run.sql
 ```
 
-for:
+Two Kafka topics
 
 ```
-/mlflow/artifacts
+taxi-trips
+
+taxi-features
 ```
 
-They must point to the exact same Docker volume.
+Flink computes
+
+```
+pickup_hour
+
+pickup_day_of_week
+
+pickup_month
+
+trip_distance
+
+passenger_count
+
+pickup_location_id
+
+dropoff_location_id
+```
+
+Consumer will read
+
+```
+taxi-features
+```
+
+instead of
+
+```
+taxi-trips
+```
 
 ---
 
-### 3. If MLflow also lacks artifacts
+# Phase 2
 
-Investigate where `log_model()` actually writes the model.
+Feast
 
-Print:
+Goal
 
-```python
-mlflow.get_artifact_uri()
+Online Feature Store.
+
+Architecture
+
+```
+Producer
+
+↓
+
+Kafka
+
+↓
+
+Flink SQL
+
+↓
+
+Feast Online Store
+
+↓
+
+API
+
+↓
+
+Prediction
 ```
 
-after logging.
+API will no longer derive features.
+
+Instead
+
+```
+feast.get_online_features(...)
+```
+
+feeds the model.
 
 ---
 
-### 4. If MLflow has artifacts but API does not
+# Later Roadmap
 
-Fix the shared Docker volume configuration.
-
----
-
-### 5. Restore normal serving
-
-Once
-
-```python
-runs:/...
-```
-
-loads successfully, switch back to:
-
-```python
-models:/taxi-duration-model/2
-```
-
-and remove all temporary debugging code.
+- Drift monitoring
+- Prometheus
+- Grafana
+- Retraining pipeline
+- CI/CD
+- Kubernetes
+- Helm
+- GitHub Actions
+- Feature monitoring
+- Model monitoring
 
 ---
 
-## Overall Assessment
+# Overall Goal
 
-The original MLflow registry/database issue appears to be resolved.
+Build a production-quality Real-Time ML Inference Platform demonstrating:
 
-The remaining blocker is now entirely related to artifact storage.
+- Data Engineering
+- Streaming
+- Feature Engineering
+- MLOps
+- Model Serving
+- Online Inference
+- MLflow Registry
+- Kafka
+- Flink SQL
+- Feast
+- Docker
+- PostgreSQL
 
-Model registration succeeds.
+Target profile:
 
-The registry contains the correct model versions.
-
-The API reaches the registry successfully.
-
-However, the API cannot locate the underlying MLmodel artifact required to load the model.
-
-The investigation should now focus exclusively on artifact storage, Docker volumes, and MLflow artifact paths rather than PostgreSQL or the model registry.
+Senior Machine Learning Engineer / MLOps Engineer.

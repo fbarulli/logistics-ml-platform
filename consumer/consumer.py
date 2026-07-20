@@ -6,9 +6,6 @@ import psycopg
 import requests
 from kafka import KafkaConsumer
 from kafka.errors import NoBrokersAvailable
-from pydantic import ValidationError
-
-from logistics_ml.schemas.taxi import TaxiTripEvent
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,7 +20,7 @@ def create_consumer() -> KafkaConsumer:
         try:
             logger.info("Connecting to Kafka...")
             consumer = KafkaConsumer(
-                "taxi-trips",
+                "taxi-features",
                 bootstrap_servers="kafka:9092",
                 auto_offset_reset="earliest",
                 group_id="taxi-debug",
@@ -31,6 +28,7 @@ def create_consumer() -> KafkaConsumer:
             )
             logger.info("Connected to Kafka.")
             return consumer
+
         except NoBrokersAvailable:
             logger.warning("Kafka not ready. Retrying in 5 seconds...")
             time.sleep(5)
@@ -49,6 +47,7 @@ def create_connection():
             conn.autocommit = True
             logger.info("Connected to PostgreSQL.")
             return conn
+
         except Exception:
             logger.warning("PostgreSQL not ready. Retrying in 5 seconds...")
             time.sleep(5)
@@ -57,20 +56,21 @@ def create_connection():
 consumer = create_consumer()
 conn = create_connection()
 
-logger.info("Waiting for events...")
+logger.info("Waiting for feature events...")
+
 
 for message in consumer:
     try:
-        event = TaxiTripEvent.model_validate(message.value)
+        event = message.value
 
         payload = {
-            "pickup_hour": event.timestamp.hour,
-            "pickup_day_of_week": event.timestamp.weekday(),
-            "pickup_month": event.timestamp.month,
-            "trip_distance": event.distance_km,
-            "passenger_count": event.passengers,
-            "pickup_location_id": event.pickup_zone,
-            "dropoff_location_id": event.dropoff_zone,
+            "pickup_hour": event["pickup_hour"],
+            "pickup_day_of_week": event["pickup_day_of_week"],
+            "pickup_month": event["pickup_month"],
+            "trip_distance": event["trip_distance"],
+            "passenger_count": event["passenger_count"],
+            "pickup_location_id": event["pickup_location_id"],
+            "dropoff_location_id": event["dropoff_location_id"],
         }
 
         while True:
@@ -82,6 +82,7 @@ for message in consumer:
                 )
                 response.raise_for_status()
                 break
+
             except requests.exceptions.RequestException:
                 logger.warning("API unavailable. Retrying in 5 seconds...")
                 time.sleep(5)
@@ -98,21 +99,16 @@ for message in consumer:
                 VALUES (%s, %s)
                 """,
                 (
-                    event.trip_id,
+                    event["trip_id"],
                     prediction,
                 ),
             )
 
         logger.info(
             "Trip %s predicted %.2f minutes",
-            event.trip_id,
+            event["trip_id"],
             prediction,
         )
-
-    except ValidationError as exc:
-        logger.error("Invalid event received:")
-        logger.error(message.value)
-        logger.exception(exc)
 
     except Exception:
         logger.exception("Failed processing event")

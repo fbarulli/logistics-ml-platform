@@ -1,5 +1,3 @@
-CREATE DATABASE logistics;
-
 CREATE DATABASE mlflow;
 
 \connect logistics
