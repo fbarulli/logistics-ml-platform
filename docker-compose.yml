@@ -1,3 +1,17 @@
-include:
-  - docker-compose.apps.yml
-  - docker-compose.streaming.yml
+services:
+  postgres:
+    image: postgres:16
+    container_name: logistics-postgres
+    environment:
+      POSTGRES_USER: logistics
+      POSTGRES_PASSWORD: logistics
+      POSTGRES_DB: logistics
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
+  postgres_data:
+  mlflow_artifacts:
