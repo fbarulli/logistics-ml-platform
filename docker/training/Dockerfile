@@ -13,6 +13,9 @@ COPY docker/patches/sqlalchemy_store.py /tmp/sqlalchemy_store.py
 
 RUN cp /tmp/sqlalchemy_store.py /usr/local/lib/python3.12/site-packages/mlflow/store/model_registry/sqlalchemy_store.py
 
+COPY src ./src
+COPY data/raw/taxi_zone_lookup.csv data/raw/taxi_zone_lookup.csv
+
 RUN apt-get update && apt-get install -y git
 ENV PYTHONPATH=/workspace/src
 
