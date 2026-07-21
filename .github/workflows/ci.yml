@@ -7,24 +7,21 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  docker-build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install dependencies
+      - name: Build API image
         run: |
-          pip install -U pip
-          pip install -r service/requirements.txt
-          pip install .
+          docker build \
+            -f service/Dockerfile \
+            -t logistics-api:test \
+            .
 
-      - name: Validate package import
+      - name: Verify package exists
         run: |
-          python -c "import logistics_ml; print('logistics_ml import OK')"
+          docker run --rm logistics-api:test \
+            python -c "import logistics_ml; print('OK')"
