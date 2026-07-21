@@ -6,32 +6,19 @@ from mlflow.tracking import MlflowClient
 
 
 def setup_mlflow(experiment_name):
-    print("=== MLFLOW SETUP ===")
     mlflow.set_tracking_uri("http://mlflow:5000")
     mlflow.set_registry_uri("http://mlflow:5000")
-    print("Tracking URI:", mlflow.get_tracking_uri())
-    print("Registry URI:", mlflow.get_registry_uri())
 
     experiment = mlflow.set_experiment(experiment_name)
-    print("Experiment ID:", experiment.experiment_id)
-
     run = mlflow.start_run()
-    print("Run ID:", run.info.run_id)
+
+    print(f"MLflow experiment: {experiment.experiment_id}")
+    print(f"Run ID: {run.info.run_id}")
+
     return run.info.run_id
 
 
 def log_metrics(model_name, rows, training_time, metrics):
-    print("=== LOG METRICS ===")
-
-    run = mlflow.active_run()
-
-    print("Active run:")
-    print(run)
-
-    if run:
-        print("Run ID:")
-        print(run.info.run_id)
-
     mlflow.log_param("model", model_name)
     mlflow.log_param("rows", rows)
     mlflow.log_metric("training_time", training_time)
@@ -39,28 +26,9 @@ def log_metrics(model_name, rows, training_time, metrics):
     for key, value in metrics.items():
         mlflow.log_metric(key, float(value))
 
-    print("Metrics logged")
-
 
 def log_model(model, model_name):
-    print("=== LOG MODEL ===")
-
     run = mlflow.active_run()
-
-    print("Active run:")
-    print(run)
-
-    if run:
-        print("Run ID:")
-        print(run.info.run_id)
-
-        print("Artifact URI (active run):")
-        print(run.info.artifact_uri)
-
-        print("mlflow.get_artifact_uri():")
-        print(mlflow.get_artifact_uri())
-
-    print("Logging model...")
 
     try:
         model_info = mlflow.sklearn.log_model(
@@ -75,60 +43,32 @@ def log_model(model, model_name):
             ],
         )
     except Exception:
-        print("\n=== log_model() EXCEPTION ===")
         traceback.print_exc()
         raise
 
-    print("Model logged")
+    client = MlflowClient()
 
-    print("Model URI:")
-    print(model_info.model_uri)
+    # Verify model artifacts
+    artifacts = client.list_artifacts(run.info.run_id, path="model")
 
-    print("=== VERIFY ARTIFACTS ===")
+    if artifacts:
+        print("✓ Model artifacts:")
+        for artifact in artifacts:
+            print(f"  - {artifact.path}")
+    else:
+        print("⚠ No model artifacts found.")
 
-    if run:
-        client = MlflowClient()
+    # Verify registered model
+    versions = client.search_model_versions(f"name='{model_name}'")
 
-        refreshed_run = client.get_run(run.info.run_id)
-
-        print("Stored artifact URI:")
-        print(refreshed_run.info.artifact_uri)
-
-        try:
-            artifacts = client.list_artifacts(run.info.run_id)
-
-            if artifacts:
-                for artifact in artifacts:
-                    print(
-                        "Artifact:",
-                        artifact.path,
-                        "Directory:",
-                        artifact.is_dir,
-                    )
-            else:
-                print("No artifacts returned by list_artifacts().")
-        except Exception:
-            print("\n=== list_artifacts() EXCEPTION ===")
-            traceback.print_exc()
-
-    print("=== VERIFY REGISTERED MODEL ===")
-
-    versions = client.search_model_versions(
-        f"name='{model_name}'"
+    latest = max(versions, key=lambda v: int(v.version))
+    print(
+        f"✓ Registered model '{latest.name}' "
+        f"version {latest.version} ({latest.status})"
     )
 
-    for version in versions:
-        print(
-            "Model:",
-            version.name,
-            "Version:",
-            version.version,
-            "Status:",
-            version.status,
-            "Run ID:",
-            version.run_id,
-            "Source:",
-            version.source,
-        )
+    # Verify model can be loaded
+    mlflow.pyfunc.load_model(model_info.model_uri)
+    print("✓ Model successfully reloaded")
 
     return model_info.model_uri
