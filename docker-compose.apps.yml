@@ -49,9 +49,7 @@ services:
       - mlflow_artifacts:/mlflow/artifacts
 
   mlflow:
-    build:
-      context: .
-      dockerfile: docker/mlflow/Dockerfile
+    image: ghcr.io/fbarulli/logistics-ml-platform-mlflow:latest
     container_name: mlflow-server
     ports:
       - "5000:5000"
