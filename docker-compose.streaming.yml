@@ -87,3 +87,29 @@ services:
 
     volumes:
       - ./flink/sql:/opt/flink/sql
+
+  producer:
+    build:
+      context: .
+      dockerfile: producer/Dockerfile
+
+    container_name: taxi-producer
+
+    depends_on:
+      - kafka
+
+    volumes:
+      - .:/workspace
+
+  consumer:
+    build:
+      context: .
+      dockerfile: consumer/Dockerfile
+
+    container_name: taxi-consumer
+
+    depends_on:
+      - kafka
+
+    volumes:
+      - .:/workspace

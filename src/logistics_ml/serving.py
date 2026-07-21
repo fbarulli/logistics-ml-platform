@@ -1,17 +1,15 @@
 import mlflow
 import pandas as pd
 
-from logistics_ml.config import MLFLOW_TRACKING_URI
+from logistics_ml.config import mlflow as mlflow_config
 
 
-MODEL_NAME = "taxi-duration-model"
+mlflow.set_tracking_uri(mlflow_config.tracking_uri)
 
 
 def load_model():
-    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-
     return mlflow.pyfunc.load_model(
-        f"models:/{MODEL_NAME}/latest"
+        f"models:/{mlflow_config.registered_model_name}@{mlflow_config.champion_alias}"
     )
 
 

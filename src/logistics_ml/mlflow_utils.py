@@ -71,6 +71,7 @@ def log_model(model, model_name):
                 "numpy.dtype",
                 "xgboost.core.Booster",
                 "xgboost.sklearn.XGBRegressor",
+                "logistics_ml.models.xgboost.XGBoostModel",
             ],
         )
     except Exception:

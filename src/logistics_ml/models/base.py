@@ -1,24 +1,28 @@
-from sqlalchemy.orm import DeclarativeBase
-
-
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Any
 
 import pandas as pd
+from sklearn.base import BaseEstimator, RegressorMixin
 
 
-class BaseModel(ABC):
+class BaseModel(BaseEstimator, RegressorMixin, ABC):
     """
-    Abstract base class for every ML model.
+    Base class for every regression model in the platform.
+
+    Compatible with:
+        - scikit-learn
+        - MLflow
+        - Optuna
+        - GridSearchCV
+        - RandomizedSearchCV
     """
 
-    name: str = "base"
+    name = "base"
 
     def __init__(self, **params: Any):
         self.params = params
-        self.model = None
 
     @abstractmethod
     def fit(
@@ -39,5 +43,9 @@ class BaseModel(ABC):
     def feature_importance(self):
         ...
 
-    def get_params(self):
-        return self.params
+    def get_params(self, deep=True):
+        return self.params.copy()
+
+    def set_params(self, **params):
+        self.params.update(params)
+        return self

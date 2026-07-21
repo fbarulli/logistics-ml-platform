@@ -25,6 +25,10 @@ services:
     volumes:
       - ./src:/workspace/src
       - ./data:/workspace/data
+    deploy:
+      resources:
+        limits:
+          memory: 3g
 
   training:
     build:
@@ -41,6 +45,7 @@ services:
       MLFLOW_TRACKING_URI: http://mlflow:5000
     volumes:
       - ./src:/workspace/src
+      - ./data:/workspace/data
       - mlflow_artifacts:/mlflow/artifacts
 
   mlflow:
@@ -65,8 +70,10 @@ services:
     container_name: taxi-api
 
     depends_on:
-      - postgres
-      - mlflow
+      postgres:
+        condition: service_started
+      mlflow:
+        condition: service_healthy
 
     ports:
       - "8000:8000"
@@ -79,35 +86,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-
-  producer:
-    build:
-      context: .
-      dockerfile: producer/Dockerfile
-
-    container_name: taxi-producer
-
-    depends_on:
-      - kafka
-
-    volumes:
-      - .:/workspace
-
-  consumer:
-    build:
-      context: .
-      dockerfile: consumer/Dockerfile
-
-    container_name: taxi-consumer
-
-    depends_on:
-      kafka:
-        condition: service_started
-      api:
-        condition: service_healthy
-
-    volumes:
-      - .:/workspace
 
 volumes:
 

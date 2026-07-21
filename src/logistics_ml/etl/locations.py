@@ -1,11 +1,11 @@
 import pandas as pd
 
-from logistics_ml.config import LOCATION_LOOKUP_FILE
+from logistics_ml.config import data as data_config
 from logistics_ml.db import engine
 
 
 def load_locations():
-    df = pd.read_csv(LOCATION_LOOKUP_FILE)
+    df = pd.read_csv(data_config.taxi_lookup)
 
     df.columns = [
         "location_id",

@@ -43,8 +43,8 @@ SELECT
     distance_km,
     passengers,
 
-    HOUR(event_time),
-    DAYOFWEEK(event_time),
-    MONTH(event_time)
+    CAST(HOUR(event_time) AS INT),
+    CAST(DAYOFWEEK(event_time) AS INT),
+    CAST(MONTH(event_time) AS INT)
 
 FROM taxi_trips;
