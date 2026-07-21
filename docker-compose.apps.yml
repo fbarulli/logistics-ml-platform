@@ -64,9 +64,7 @@ services:
       retries: 20
 
   api:
-    build:
-      context: .
-      dockerfile: service/Dockerfile
+    image: ghcr.io/fbarulli/logistics-ml-platform-api:latest
     container_name: taxi-api
 
     depends_on:
