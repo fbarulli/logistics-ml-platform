@@ -1,25 +1,23 @@
 import time
 import uuid
 import os
+
 from fastapi import FastAPI
-from pydantic import BaseModel
+from pydantic import create_model
 import mlflow
 import pandas as pd
+
+from logistics_ml.features.schema import RAW_FEATURE_TYPES
 
 app = FastAPI()
 
 MODEL_NAME = "taxi-duration-model"
 MODEL_ALIAS = "champion"
 
-FEATURE_ORDER = [
-    "passenger_count",
-    "pickup_location_id",
-    "dropoff_location_id",
-    "pickup_hour",
-    "pickup_day_of_week",
-    "pickup_month",
-    "trip_distance",
-]
+TaxiTrip = create_model(
+    "TaxiTrip",
+    **{name: (typ, ...) for name, typ in RAW_FEATURE_TYPES.items()},
+)
 
 model = None
 prediction_count = 0
@@ -28,68 +26,42 @@ model_load_time = 0.0
 model_ready = False
 
 
-class TaxiTrip(BaseModel):
-    pickup_hour: int
-    pickup_day_of_week: int
-    pickup_month: int
-    passenger_count: float
-    trip_distance: float
-    pickup_location_id: int
-    dropoff_location_id: int
-
-
 def get_model():
     global model
     global model_load_time
-
     if model is None:
         start = time.time()
-
         print("=== LOADING MODEL ===")
-
         tracking_uri = os.getenv(
             "MLFLOW_TRACKING_URI",
             "http://mlflow:5000",
         )
-
         print("MLFLOW URI:")
         print(tracking_uri)
-
         mlflow.set_tracking_uri(tracking_uri)
-
         client = mlflow.MlflowClient()
-
         mv = client.get_model_version_by_alias(
             MODEL_NAME,
             MODEL_ALIAS,
         )
-
         model_uri = f"models:/{MODEL_NAME}/{mv.version}"
-
         print("RESOLVED MODEL VERSION:")
         print(mv.version)
-
         print("MODEL URI:")
         print(model_uri)
-
         model = mlflow.pyfunc.load_model(model_uri)
-
         model_load_time = time.time() - start
-
         print("MODEL LOADED")
         print(
             f"MODEL LOAD TIME: {model_load_time * 1000:.2f} ms"
         )
-
     return model
 
 
 @app.on_event("startup")
 def startup():
     global model_ready
-
     get_model()
-
     model_ready = True
 
 
@@ -106,16 +78,12 @@ def model_info():
         "MLFLOW_TRACKING_URI",
         "http://mlflow:5000",
     )
-
     mlflow.set_tracking_uri(tracking_uri)
-
     client = mlflow.MlflowClient()
-
     mv = client.get_model_version_by_alias(
         MODEL_NAME,
         MODEL_ALIAS,
     )
-
     return {
         "model": MODEL_NAME,
         "version": mv.version,
@@ -129,20 +97,12 @@ def predict(trip: TaxiTrip):
     global total_prediction_time
 
     request_id = str(uuid.uuid4())
-
     model = get_model()
 
-    values = trip.model_dump()
-
-    data = pd.DataFrame(
-        [[values[field] for field in FEATURE_ORDER]],
-        columns=FEATURE_ORDER,
-    )
+    data = pd.DataFrame([trip.model_dump()])
 
     start = time.time()
-
     prediction = model.predict(data)
-
     latency = time.time() - start
 
     prediction_count += 1
@@ -165,12 +125,10 @@ def predict(trip: TaxiTrip):
 @app.get("/metrics")
 def metrics():
     avg_latency = 0
-
     if prediction_count:
         avg_latency = (
             total_prediction_time / prediction_count
         ) * 1000
-
     return {
         "predictions": prediction_count,
         "average_prediction_latency_ms": round(avg_latency, 2),

@@ -15,6 +15,7 @@ from logistics_ml.mlflow_utils import (
     setup_mlflow,
 )
 from logistics_ml.models import get_model
+from logistics_ml.models.pyfunc_wrapper import TaxiDurationPyfuncModel
 
 
 def parse_args():
@@ -58,7 +59,7 @@ def evaluate_model(model, X_test, y_test):
     return metrics
 
 
-def register_model(model, model_name, rows, training_time, metrics):
+def register_model(model, model_name, rows, training_time, metrics, input_example=None):
 
     log_metrics(
         model_name=model_name,
@@ -70,6 +71,7 @@ def register_model(model, model_name, rows, training_time, metrics):
     return log_model(
         model,
         mlflow_config.registered_model_name,
+        input_example=input_example,
     )
 
 
@@ -87,7 +89,7 @@ def main():
 
     print(f"Loaded {len(df):,} rows")
 
-    X_train, X_test, y_train, y_test = prepare_dataset(df)
+    X_train, X_test, y_train, y_test, pipeline = prepare_dataset(df)
 
     model, training_time = train_model(
         args.model,
@@ -101,12 +103,19 @@ def main():
         y_test,
     )
 
+    wrapped_model = TaxiDurationPyfuncModel(pipeline, model)
+
+    from logistics_ml.features import RAW_FEATURES
+
+    input_example = df[RAW_FEATURES].head(5)
+
     model_uri = register_model(
-        model,
+        wrapped_model,
         args.model,
         len(df),
         training_time,
         metrics,
+        input_example=input_example,
     )
 
     client = mlflow.MlflowClient()

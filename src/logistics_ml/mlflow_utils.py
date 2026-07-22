@@ -1,20 +1,16 @@
 import traceback
-
 import mlflow
-import mlflow.sklearn
+import mlflow.pyfunc
 from mlflow.tracking import MlflowClient
 
 
 def setup_mlflow(experiment_name):
     mlflow.set_tracking_uri("http://mlflow:5000")
     mlflow.set_registry_uri("http://mlflow:5000")
-
     experiment = mlflow.set_experiment(experiment_name)
     run = mlflow.start_run()
-
     print(f"MLflow experiment: {experiment.experiment_id}")
     print(f"Run ID: {run.info.run_id}")
-
     return run.info.run_id
 
 
@@ -22,25 +18,19 @@ def log_metrics(model_name, rows, training_time, metrics):
     mlflow.log_param("model", model_name)
     mlflow.log_param("rows", rows)
     mlflow.log_metric("training_time", training_time)
-
     for key, value in metrics.items():
         mlflow.log_metric(key, float(value))
 
 
-def log_model(model, model_name):
+def log_model(model, model_name, input_example=None):
     run = mlflow.active_run()
 
     try:
-        model_info = mlflow.sklearn.log_model(
-            sk_model=model,
+        model_info = mlflow.pyfunc.log_model(
             name="model",
+            python_model=model,
             registered_model_name=model_name,
-            skops_trusted_types=[
-                "numpy.dtype",
-                "xgboost.core.Booster",
-                "xgboost.sklearn.XGBRegressor",
-                "logistics_ml.models.xgboost.XGBoostModel",
-            ],
+            input_example=input_example,
         )
     except Exception:
         traceback.print_exc()

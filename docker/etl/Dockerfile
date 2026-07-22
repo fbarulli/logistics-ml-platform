@@ -1,3 +1,4 @@
+#docker/etl/Dockerfile
 FROM python:3.12-slim
 WORKDIR /workspace
 RUN apt-get update && \
