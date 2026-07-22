@@ -31,18 +31,11 @@ while True:
 
     event = {
         "trip_id": str(random.randint(100000, 999999)),
-        "pickup_zone": random.randint(1, 50),
-        "dropoff_zone": random.randint(1, 50),
-        "distance_km": round(random.uniform(1, 20), 2),
-        "passengers": random.randint(1, 4),
-
-        # keep the raw timestamp for traceability
-        "timestamp": now.isoformat(),
-
-        # precomputed ML features
-        "pickup_hour": now.hour,
-        "pickup_day_of_week": now.weekday(),
-        "pickup_month": now.month,
+        "pickup_datetime": now.isoformat(),
+        "passenger_count": random.randint(1, 4),
+        "trip_distance": round(random.uniform(1, 20), 2),
+        "pickup_location_id": random.randint(1, 263),
+        "dropoff_location_id": random.randint(1, 263),
     }
 
     producer.send("taxi-trips", event)

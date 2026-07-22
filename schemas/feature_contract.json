@@ -1,0 +1,31 @@
+{
+  "raw_features": [
+    {
+      "name": "pickup_datetime",
+      "type": "<class 'datetime.datetime'>"
+    },
+    {
+      "name": "passenger_count",
+      "type": "<class 'float'>"
+    },
+    {
+      "name": "trip_distance",
+      "type": "<class 'float'>"
+    },
+    {
+      "name": "pickup_location_id",
+      "type": "<class 'int'>"
+    },
+    {
+      "name": "dropoff_location_id",
+      "type": "<class 'int'>"
+    }
+  ],
+  "required_order": [
+    "pickup_datetime",
+    "passenger_count",
+    "trip_distance",
+    "pickup_location_id",
+    "dropoff_location_id"
+  ]
+}

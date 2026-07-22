@@ -1,4 +1,4 @@
-.PHONY: up down build load train train-logs
+.PHONY: up down build load train train-logs generate-schema
 
 CLUSTER_NAME := logistics-ml
 TRAINING_IMAGE := training:local
@@ -25,3 +25,7 @@ train:
 
 train-logs:
 	kubectl logs -f -n database job/training
+
+
+generate-schema:
+	uv run python scripts/generate_feature_contract.py
