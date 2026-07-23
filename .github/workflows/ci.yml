@@ -1,7 +1,9 @@
 name: CI
+
 on:
   push:
-
+    branches:
+      - main
   pull_request:
 
 permissions:
@@ -48,7 +50,9 @@ jobs:
               sys.exit(1)
           PY
 
-  api-build:
+  build-python-base:
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -57,22 +61,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/fbarulli/logistics-ml-platform-api
-          tags: |
-            type=raw,value=latest
-            type=sha,format=short
-
-  docker-build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      # 1. Automatically generate smart tags (latest + commit SHA)
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/fbarulli/logistics-ml-platform-api
+          images: ghcr.io/fbarulli/logistics-python-base
           tags: |
             type=raw,value=latest
             type=sha,format=short
@@ -80,28 +69,72 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }} # Keep this exactly as written
+          username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Debug files
-        run: |
-          pwd
-          ls -la
-          ls -la service
-      - name: Build and push multi-platform image
+      - name: Build and push base image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: service/Dockerfile
+          file: docker/python/Dockerfile.base
           push: true
-          platforms: linux/amd64,linux/arm64
-          # 2. Reference the dynamically generated tags here
+          platforms: linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  build-python:
+    needs: build-python-base
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/fbarulli/logistics-python
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      # docker/python/Dockerfile has `FROM logistics-python-base:latest`
+      # (an unqualified local tag, matching the existing local dev workflow).
+      # Pull the image we just pushed and re-tag it locally so that FROM
+      # resolves without editing the Dockerfile.
+      - name: Pull and re-tag base image
+        run: |
+          docker pull ghcr.io/fbarulli/logistics-python-base:latest
+          docker tag ghcr.io/fbarulli/logistics-python-base:latest logistics-python-base:latest
+      - name: Build and push app image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/python/Dockerfile
+          push: true
+          platforms: linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
   mlflow-build:
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -122,6 +155,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Build and push MLflow image
@@ -130,6 +165,6 @@ jobs:
           context: .
           file: docker/mlflow/Dockerfile
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
