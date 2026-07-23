@@ -1,11 +1,10 @@
 import json
 import logging
 import time
-
 import psycopg
 import requests
 from kafka import KafkaConsumer
-from kafka.errors import NoBrokersAvailable
+from kafka.errors import KafkaTimeoutError
 from logistics_ml.features.schema import STREAM_FEATURE_TYPES
 
 logging.basicConfig(
@@ -30,7 +29,7 @@ def create_consumer() -> KafkaConsumer:
             logger.info("Connected to Kafka.")
             return consumer
 
-        except NoBrokersAvailable:
+        except KafkaTimeoutError:
             logger.warning("Kafka not ready. Retrying in 5 seconds...")
             time.sleep(5)
 

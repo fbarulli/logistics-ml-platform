@@ -1,16 +1,10 @@
-FROM python:3.12-slim
+FROM logistics-python-base:latest
 
 WORKDIR /workspace
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    git \
-    libgomp1 && \
-    rm -rf /var/lib/apt/lists/*
-
 COPY . .
 
-RUN pip install --no-cache-dir -e .
+RUN uv pip install --no-deps -e .
 
 COPY docker/patches/sqlalchemy_store.py /tmp/sqlalchemy_store.py
 

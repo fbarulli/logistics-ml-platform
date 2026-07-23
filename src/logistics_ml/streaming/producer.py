@@ -1,10 +1,11 @@
+
 import json
 import random
 import time
 from datetime import datetime, timezone
 
 from kafka import KafkaProducer
-from kafka.errors import NoBrokersAvailable
+from kafka.errors import KafkaTimeoutError
 
 
 def create_producer():
@@ -18,7 +19,7 @@ def create_producer():
             print("Connected to Kafka.")
             return producer
 
-        except NoBrokersAvailable:
+        except KafkaTimeoutError:
             print("Kafka not ready, retrying in 5 seconds...")
             time.sleep(5)
 

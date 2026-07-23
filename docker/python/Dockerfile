@@ -1,19 +1,8 @@
-FROM python:3.12-slim
+FROM logistics-python-base:latest
 
 WORKDIR /workspace
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    libgomp1 && \
-    rm -rf /var/lib/apt/lists/*
-
-# Dependency cache layer
 COPY pyproject.toml .
-
-RUN pip install --no-cache-dir -e .
-
-# Application source
 COPY src ./src
 
-# Update editable install to point at current source
-RUN pip install --no-deps -e .
+RUN pip install --no-cache-dir --no-deps -e .
