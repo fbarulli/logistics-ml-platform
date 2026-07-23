@@ -48,9 +48,9 @@ def get_loaded_files():
         }
 
 
-def mark_file_loaded(filename, row_count):
-    with engine.begin() as conn:
-        conn.exec_driver_sql(
+def mark_file_loaded(raw_conn, filename, row_count):
+    with raw_conn.cursor() as cur:
+        cur.execute(
             "INSERT INTO etl_file_manifest (filename, row_count) VALUES (%s, %s)",
             (filename, row_count),
         )
@@ -122,8 +122,8 @@ def load_taxi_trips():
                     copy_batch(raw_conn, part)
                     file_rows += len(part)
 
+                mark_file_loaded(raw_conn, f.name, file_rows)
                 raw_conn.commit()
-                mark_file_loaded(f.name, file_rows)
                 total_rows += file_rows
                 print(
                     f"Finished {f.name}: "

@@ -79,3 +79,54 @@ def log_model(model, model_name, input_example=None):
     print("✓ Model successfully reloaded")
 
     return model_info.model_uri
+
+
+def register_candidate(
+    model,
+    model_name,
+    rows,
+    training_time,
+    metrics,
+    input_example=None,
+):
+    log_metrics(
+        model_name=model_name,
+        rows=rows,
+        training_time=training_time,
+        metrics=metrics,
+    )
+
+    model_uri = log_model(
+        model,
+        model_name,
+        input_example=input_example,
+    )
+
+    client = MlflowClient()
+
+    versions = client.search_model_versions(
+        f"name='{model_name}'"
+    )
+
+    version = int(
+        max(
+            versions,
+            key=lambda v: int(v.version),
+        ).version
+    )
+
+    return model_uri, version
+
+
+def promote_candidate(
+    model_name,
+    alias,
+    version,
+):
+    client = MlflowClient()
+
+    client.set_registered_model_alias(
+        name=model_name,
+        alias=alias,
+        version=version,
+    )

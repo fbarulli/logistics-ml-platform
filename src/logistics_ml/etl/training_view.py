@@ -1,3 +1,4 @@
+# src/logistics_ml/etl/training_view.py
 from sqlalchemy import text
 
 from logistics_ml.db import engine

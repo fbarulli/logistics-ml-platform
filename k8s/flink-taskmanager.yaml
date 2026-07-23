@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: taskmanager
+  namespace: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: taskmanager
+  template:
+    metadata:
+      labels:
+        app: taskmanager
+    spec:
+      containers:
+        - name: taskmanager
+          image: flink:local
+          imagePullPolicy: IfNotPresent
+          args: ["taskmanager"]
+          env:
+            - name: FLINK_PROPERTIES
+              value: |
+                jobmanager.rpc.address: jobmanager
+                taskmanager.numberOfTaskSlots: 2
+          volumeMounts:
+            - name: flink-sql
+              mountPath: /opt/flink/sql/run.sql
+              subPath: run.sql
+            - name: flink-sql
+              mountPath: /opt/flink/sql/generated/01-source.sql
+              subPath: 01-source.sql
+            - name: flink-sql
+              mountPath: /opt/flink/sql/generated/02-sink.sql
+              subPath: 02-sink.sql
+            - name: flink-sql
+              mountPath: /opt/flink/sql/generated/03-transform.sql
+              subPath: 03-transform.sql
+      volumes:
+        - name: flink-sql
+          configMap:
+            name: flink-sql-configmap

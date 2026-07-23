@@ -5,7 +5,7 @@ SELECT
     dropoff_location_id,
     trip_distance,
     passenger_count,
-    EXTRACT(HOUR FROM CAST(pickup_datetime AS TIMESTAMP(3))),
-    EXTRACT(DAY_OF_WEEK FROM CAST(pickup_datetime AS TIMESTAMP(3))),
-    EXTRACT(MONTH FROM CAST(pickup_datetime AS TIMESTAMP(3)))
+    CAST(EXTRACT(HOUR FROM CAST(pickup_datetime AS TIMESTAMP(3))) AS INT),
+    CAST(MOD(DAYOFWEEK(CAST(pickup_datetime AS TIMESTAMP(3))) + 5, 7) AS INT),
+    CAST(EXTRACT(MONTH FROM CAST(pickup_datetime AS TIMESTAMP(3))) AS INT)
 FROM taxi_trips;

@@ -135,6 +135,7 @@ services:
     volumes:
       - ./data:/workspace/data
       - ./logs:/workspace/logs
+      - ./src:/workspace/src
     mem_limit: 8g
     mem_reservation: 1g
 

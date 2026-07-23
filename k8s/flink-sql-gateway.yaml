@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sql-gateway
+  namespace: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sql-gateway
+  template:
+    metadata:
+      labels:
+        app: sql-gateway
+    spec:
+      containers:
+        - name: sql-gateway
+          image: flink:local
+          imagePullPolicy: IfNotPresent
+          command:
+            - "./bin/sql-gateway.sh"
+          args:
+            - "start-foreground"
+            - "-Dsql-gateway.endpoint.rest.address=0.0.0.0"
+            - "-Dsql-gateway.endpoint.rest.port=8083"
+          ports:
+            - containerPort: 8083
+          volumeMounts:
+            - name: flink-config
+              mountPath: /opt/flink/conf/config.yaml
+              subPath: config.yaml
+
+            - name: flink-sql
+              mountPath: /opt/flink/sql/run.sql
+              subPath: run.sql
+
+            - name: flink-sql
+              mountPath: /opt/flink/sql/generated/01-source.sql
+              subPath: 01-source.sql
+
+            - name: flink-sql
+              mountPath: /opt/flink/sql/generated/02-sink.sql
+              subPath: 02-sink.sql
+
+            - name: flink-sql
+              mountPath: /opt/flink/sql/generated/03-transform.sql
+              subPath: 03-transform.sql
+
+      volumes:
+        - name: flink-config
+          configMap:
+            name: flink-config
+
+        - name: flink-sql
+          configMap:
+            name: flink-sql-configmap
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sql-gateway
+  namespace: database
+spec:
+  selector:
+    app: sql-gateway
+  ports:
+    - name: rest
+      port: 8083
+      targetPort: 8083

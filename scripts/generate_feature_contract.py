@@ -35,13 +35,13 @@ def feature_type(dtype):
 
 def transform_expression(name):
     if name == "pickup_hour":
-        return "EXTRACT(HOUR FROM CAST(pickup_datetime AS TIMESTAMP(3)))"
+        return "CAST(EXTRACT(HOUR FROM CAST(pickup_datetime AS TIMESTAMP(3))) AS INT)"
 
     if name == "pickup_day_of_week":
-        return "EXTRACT(DAY_OF_WEEK FROM CAST(pickup_datetime AS TIMESTAMP(3)))"
+        return "CAST(MOD(DAYOFWEEK(CAST(pickup_datetime AS TIMESTAMP(3))) + 5, 7) AS INT)"
 
     if name == "pickup_month":
-        return "EXTRACT(MONTH FROM CAST(pickup_datetime AS TIMESTAMP(3)))"
+        return "CAST(EXTRACT(MONTH FROM CAST(pickup_datetime AS TIMESTAMP(3))) AS INT)"
 
     return name
 
@@ -82,9 +82,11 @@ def main():
     {raw_columns}
 )
 WITH (
-    'connector' = 'Kafka',
+    'connector' = 'kafka',
     'topic' = 'taxi-trips',
     'properties.bootstrap.servers' = 'kafka:9092',
+    'properties.group.id' = 'taxi-feature-pipeline',
+    'scan.startup.mode' = 'earliest-offset',
     'format' = 'json'
 );
 """
@@ -99,7 +101,7 @@ WITH (
     {sink_columns}
 )
 WITH (
-    'connector' = 'Kafka',
+    'connector' = 'kafka',
     'topic' = 'taxi-features',
     'properties.bootstrap.servers' = 'kafka:9092',
     'format' = 'json'

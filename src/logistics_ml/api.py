@@ -1,6 +1,6 @@
 import time
 import uuid
-import os
+from logistics_ml.config.mlflow import mlflow as mlflow_config
 
 from fastapi import FastAPI
 from pydantic import create_model
@@ -11,8 +11,8 @@ from logistics_ml.features.schema import RAW_FEATURE_TYPES
 
 app = FastAPI()
 
-MODEL_NAME = "taxi-duration-model"
-MODEL_ALIAS = "champion"
+MODEL_NAME = mlflow_config.registered_model_name
+MODEL_ALIAS = mlflow_config.champion_alias
 
 TaxiTrip = create_model(
     "TaxiTrip",
@@ -32,10 +32,7 @@ def get_model():
     if model is None:
         start = time.time()
         print("=== LOADING MODEL ===")
-        tracking_uri = os.getenv(
-            "MLFLOW_TRACKING_URI",
-            "http://mlflow:5000",
-        )
+        tracking_uri = mlflow_config.tracking_uri
         print("MLFLOW URI:")
         print(tracking_uri)
         mlflow.set_tracking_uri(tracking_uri)
@@ -74,10 +71,7 @@ def health():
 
 @app.get("/model")
 def model_info():
-    tracking_uri = os.getenv(
-        "MLFLOW_TRACKING_URI",
-        "http://mlflow:5000",
-    )
+    tracking_uri = mlflow_config.tracking_uri
     mlflow.set_tracking_uri(tracking_uri)
     client = mlflow.MlflowClient()
     mv = client.get_model_version_by_alias(

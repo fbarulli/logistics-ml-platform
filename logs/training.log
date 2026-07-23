@@ -1,21 +1,20 @@
 Training model: xgb
 MLflow experiment: 1
-Run ID: f87c9877d76b475385912637d8c6892e
+Run ID: 6e072e7fc3fb496cbbe228b755958d6f
 Loading training_data...
 Loaded 15,304,978 rows
-Loaded 15,304,978 rows
 Starting training...
-Training completed in 48.96s
+Training completed in 49.16s
 
 Results
 MAE : 3.11
-RMSE: 5.71
-R²  : 0.7895
-2026/07/23 11:41:45 INFO mlflow.pyfunc: Inferring model signature from input example
-Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 1147.24it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 998.64it/s] 
+RMSE: 5.70
+R²  : 0.7904
+2026/07/23 12:34:57 INFO mlflow.pyfunc: Inferring model signature from input example
+Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 1096.26it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 829.24it/s] 
 Registered model 'taxi-duration-model' already exists. Creating a new version of this model...
-2026/07/23 11:41:55 INFO mlflow.store.model_registry.abstract_store: Waiting up to 300 seconds for model version to finish creation. Model name: taxi-duration-model, version 2
-Created version '2' of model 'taxi-duration-model'.
+2026/07/23 12:35:04 INFO mlflow.store.model_registry.abstract_store: Waiting up to 300 seconds for model version to finish creation. Model name: taxi-duration-model, version 4
+Created version '4' of model 'taxi-duration-model'.
 ✓ Model artifacts:
   - model/MLmodel
   - model/__pycache__
@@ -26,10 +25,10 @@ Created version '2' of model 'taxi-duration-model'.
   - model/python_env.yaml
   - model/requirements.txt
   - model/serving_input_example.json
-✓ Registered model 'taxi-duration-model' version 2 (READY)
+✓ Registered model 'taxi-duration-model' version 4 (READY)
 ✓ Model successfully reloaded
 === TRAINING COMPLETE ===
-Model URI: models:/m-8986756f19184ecfb97192186a288fd0
-Champion version: 2
-🏃 View run amusing-vole-887 at: http://mlflow:5000/#/experiments/1/runs/f87c9877d76b475385912637d8c6892e
+Model URI: models:/m-ee3eb619b0ea46abbfbe726379b0560a
+Champion version: 4
+🏃 View run sneaky-shrew-170 at: http://mlflow:5000/#/experiments/1/runs/6e072e7fc3fb496cbbe228b755958d6f
 🧪 View experiment at: http://mlflow:5000/#/experiments/1

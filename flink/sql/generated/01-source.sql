@@ -7,8 +7,10 @@ CREATE TABLE taxi_trips (
     dropoff_location_id INT
 )
 WITH (
-    'connector' = 'Kafka',
+    'connector' = 'kafka',
     'topic' = 'taxi-trips',
     'properties.bootstrap.servers' = 'kafka:9092',
+    'properties.group.id' = 'taxi-feature-pipeline',
+    'scan.startup.mode' = 'earliest-offset',
     'format' = 'json'
 );

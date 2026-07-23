@@ -9,7 +9,7 @@ CREATE TABLE taxi_features (
     pickup_month INT
 )
 WITH (
-    'connector' = 'Kafka',
+    'connector' = 'kafka',
     'topic' = 'taxi-features',
     'properties.bootstrap.servers' = 'kafka:9092',
     'format' = 'json'

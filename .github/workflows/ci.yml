@@ -1,5 +1,4 @@
 name: CI
-
 on:
   push:
     branches: [main]
@@ -11,12 +10,52 @@ permissions:
   packages: write
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Generate feature contract
+        run: uv run python scripts/generate_feature_contract.py
+
+      - name: Ensure generated files are committed
+        run: git diff --exit-code
+
+      - name: Validate Kubernetes manifests
+        run: |
+          kubectl apply \
+            --dry-run=client \
+            -f k8s/
+      - name: Check Python entrypoints exist
+        run: |
+          python - <<'PY'
+          import pathlib
+          import re
+          import sys
+          compose = pathlib.Path("docker-compose.yml").read_text()
+          modules = re.findall(r'logistics_ml\.([A-Za-z0-9_]+)', compose)
+          missing = []
+          for module in modules:
+              path = pathlib.Path(f"src/logistics_ml/{module}.py")
+              if not path.exists():
+                  missing.append(module)
+          if missing:
+              print("Missing modules:", missing)
+              sys.exit(1)
+          PY
+
   api-build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -28,11 +67,9 @@ jobs:
 
   docker-build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       # 1. Automatically generate smart tags (latest + commit SHA)
       - name: Extract Docker metadata
         id: meta
@@ -42,26 +79,21 @@ jobs:
           tags: |
             type=raw,value=latest
             type=sha,format=short
-
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }} # Keep this exactly as written
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Debug files
         run: |
           pwd
           ls -la
           ls -la service
-
       - name: Build and push multi-platform image
         uses: docker/build-push-action@v6
         with:
@@ -74,11 +106,9 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
   mlflow-build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -87,20 +117,16 @@ jobs:
           tags: |
             type=raw,value=latest
             type=sha,format=short
-
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Build and push MLflow image
         uses: docker/build-push-action@v6
         with:
