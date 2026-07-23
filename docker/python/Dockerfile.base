@@ -7,7 +7,8 @@ RUN apt-get update && \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml .
-COPY src ./src
+RUN pip install --no-cache-dir uv
 
-RUN pip install --no-cache-dir -e .
+COPY pyproject.toml uv.lock ./
+
+RUN uv sync --frozen --no-dev
