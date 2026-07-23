@@ -6,6 +6,9 @@ from logistics_ml.config.mlflow import mlflow as mlflow_config
 from logistics_ml.data import load_training_data
 from logistics_ml.evaluation import evaluate
 from logistics_ml.features import prepare_dataset
+from types import SimpleNamespace
+
+from logistics_ml.features import RAW_FEATURES
 from logistics_ml.mlflow_utils import (
     log_metrics,
     log_model,
@@ -57,56 +60,104 @@ def register_model(model, model_name, rows, training_time, metrics, input_exampl
     )
 
 
-def main():
-    args = parse_args()
-    print(f"Training model: {args.model}")
-    setup_mlflow(
-        mlflow_config.experiment_name,
-    )
-    df = load_training_data()
-    print(f"Loaded {len(df):,} rows")
-    X_train, X_test, y_train, y_test, pipeline = prepare_dataset(df)
-    model, training_time = train_model(
-        args.model,
-        X_train,
-        y_train,
-    )
-    metrics = evaluate_model(
-        model,
-        X_test,
-        y_test,
-    )
-    from types import SimpleNamespace
-    wrapped_model = SimpleNamespace(feature_pipeline=pipeline, model=model)
-    from logistics_ml.features import RAW_FEATURES
+def build_input_example(df):
     input_example = df[RAW_FEATURES].head(5).copy()
-    input_example["pickup_location_id"] = input_example["pickup_location_id"].astype(
-        "float64")
-    input_example["dropoff_location_id"] = input_example["dropoff_location_id"].astype(
-        "float64")
-    model_uri = register_model(
+    input_example["pickup_location_id"] = input_example[
+        "pickup_location_id"
+    ].astype("float64")
+    input_example["dropoff_location_id"] = input_example[
+        "dropoff_location_id"
+    ].astype("float64")
+    return input_example
+
+
+def log_candidate(
+    wrapped_model,
+    model_name,
+    rows,
+    training_time,
+    metrics,
+    input_example,
+):
+    log_metrics(
+        model_name=model_name,
+        rows=rows,
+        training_time=training_time,
+        metrics=metrics,
+    )
+
+    model_uri = log_model(
         wrapped_model,
-        args.model,
-        len(df),
-        training_time,
-        metrics,
+        mlflow_config.registered_model_name,
         input_example=input_example,
     )
+
     client = mlflow.MlflowClient()
     versions = client.search_model_versions(
         f"name='{mlflow_config.registered_model_name}'"
     )
+
     version = int(
         max(
             versions,
-            key=lambda x: int(x.version),
+            key=lambda v: int(v.version),
         ).version
     )
+
+    return model_uri, version
+
+
+def promote_candidate(version):
+    client = mlflow.MlflowClient()
+
     client.set_registered_model_alias(
         name=mlflow_config.registered_model_name,
         alias=mlflow_config.champion_alias,
         version=version,
     )
+
+
+def main():
+    args = parse_args()
+
+    print(f"Training model: {args.model}")
+
+    setup_mlflow(
+        mlflow_config.experiment_name,
+    )
+
+    df = load_training_data()
+
+    X_train, X_test, y_train, y_test, pipeline = prepare_dataset(df)
+
+    model, training_time = train_model(
+        args.model,
+        X_train,
+        y_train,
+    )
+
+    metrics = evaluate_model(
+        model,
+        X_test,
+        y_test,
+    )
+
+    wrapped_model = SimpleNamespace(
+        feature_pipeline=pipeline,
+        model=model,
+    )
+
+    model_uri, version = log_candidate(
+        wrapped_model=wrapped_model,
+        model_name=args.model,
+        rows=len(df),
+        training_time=training_time,
+        metrics=metrics,
+        input_example=build_input_example(df),
+    )
+
+    promote_candidate(version)
+
     print("=== TRAINING COMPLETE ===")
     print(f"Model URI: {model_uri}")
     print(f"Champion version: {version}")
