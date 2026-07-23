@@ -1,4 +1,8 @@
+import os
+import tempfile
 import traceback
+
+import joblib
 import mlflow
 import mlflow.pyfunc
 from mlflow.tracking import MlflowClient
@@ -25,22 +29,36 @@ def log_metrics(model_name, rows, training_time, metrics):
 def log_model(model, model_name, input_example=None):
     run = mlflow.active_run()
 
-    try:
-        model_info = mlflow.pyfunc.log_model(
-            name="model",
-            python_model=model,
-            registered_model_name=model_name,
-            input_example=input_example,
+    wrapper_path = os.path.join(
+        os.path.dirname(__file__), "models", "pyfunc_wrapper.py"
+    )
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        bundle_path = os.path.join(tmp_dir, "model_bundle.joblib")
+        joblib.dump(
+            {
+                "feature_pipeline": model.feature_pipeline,
+                "model": model.model,
+            },
+            bundle_path,
         )
-    except Exception:
-        traceback.print_exc()
-        raise
+
+        try:
+            model_info = mlflow.pyfunc.log_model(
+                name="model",
+                python_model=wrapper_path,
+                artifacts={"model_bundle": bundle_path},
+                registered_model_name=model_name,
+                input_example=input_example,
+            )
+        except Exception:
+            traceback.print_exc()
+            raise
 
     client = MlflowClient()
 
     # Verify model artifacts
     artifacts = client.list_artifacts(run.info.run_id, path="model")
-
     if artifacts:
         print("✓ Model artifacts:")
         for artifact in artifacts:
@@ -50,7 +68,6 @@ def log_model(model, model_name, input_example=None):
 
     # Verify registered model
     versions = client.search_model_versions(f"name='{model_name}'")
-
     latest = max(versions, key=lambda v: int(v.version))
     print(
         f"✓ Registered model '{latest.name}' "

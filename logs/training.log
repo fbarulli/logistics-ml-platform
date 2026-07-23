@@ -1,0 +1,35 @@
+Training model: xgb
+MLflow experiment: 1
+Run ID: f87c9877d76b475385912637d8c6892e
+Loading training_data...
+Loaded 15,304,978 rows
+Loaded 15,304,978 rows
+Starting training...
+Training completed in 48.96s
+
+Results
+MAE : 3.11
+RMSE: 5.71
+R²  : 0.7895
+2026/07/23 11:41:45 INFO mlflow.pyfunc: Inferring model signature from input example
+Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 1147.24it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 998.64it/s] 
+Registered model 'taxi-duration-model' already exists. Creating a new version of this model...
+2026/07/23 11:41:55 INFO mlflow.store.model_registry.abstract_store: Waiting up to 300 seconds for model version to finish creation. Model name: taxi-duration-model, version 2
+Created version '2' of model 'taxi-duration-model'.
+✓ Model artifacts:
+  - model/MLmodel
+  - model/__pycache__
+  - model/artifacts
+  - model/conda.yaml
+  - model/input_example.json
+  - model/pyfunc_wrapper.py
+  - model/python_env.yaml
+  - model/requirements.txt
+  - model/serving_input_example.json
+✓ Registered model 'taxi-duration-model' version 2 (READY)
+✓ Model successfully reloaded
+=== TRAINING COMPLETE ===
+Model URI: models:/m-8986756f19184ecfb97192186a288fd0
+Champion version: 2
+🏃 View run amusing-vole-887 at: http://mlflow:5000/#/experiments/1/runs/f87c9877d76b475385912637d8c6892e
+🧪 View experiment at: http://mlflow:5000/#/experiments/1
