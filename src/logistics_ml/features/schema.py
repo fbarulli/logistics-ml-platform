@@ -23,6 +23,16 @@ RAW_FEATURE_TYPES = {
     "dropoff_location_id": int,
 }
 
+STREAM_FEATURE_TYPES = {
+    "pickup_location_id": int,
+    "dropoff_location_id": int,
+    "trip_distance": float,
+    "passenger_count": float,
+    "pickup_hour": int,
+    "pickup_day_of_week": int,
+    "pickup_month": int,
+}
+
 ENGINEERED_FEATURES = [
     "pickup_hour",
     "pickup_day_of_week",

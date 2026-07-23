@@ -1,4 +1,4 @@
-#/workspace/docker/postgres/init.sql
+-- /workspace/docker/postgres/init.sql
 CREATE DATABASE mlflow;
 
 \connect logistics

@@ -1,4 +1,3 @@
-
 INSERT INTO taxi_features
 SELECT
     trip_id,

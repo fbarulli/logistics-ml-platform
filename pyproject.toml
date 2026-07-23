@@ -1,26 +1,24 @@
-[build-system]
-requires = ["setuptools>=69", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "logistics-ml"
 version = "0.1.0"
 description = "Production-style logistics ML platform"
 requires-python = ">=3.12"
+
 dependencies = [
     "jupyter>=1.1.1",
     "lightgbm>=4.7.0",
     "matplotlib>=3.11.1",
-    "pandas>=3.0.3",
+    "pandas>=2.2.0",
+    "pyarrow>=18.0.0",
     "psycopg2-binary>=2.9.12",
+    "psycopg[binary]",
+    "pydantic>=2.0",
     "scikit-learn>=1.9.0",
     "scipy>=1.18.0",
     "sqlalchemy>=2.0.51",
+    "tqdm>=4.66.0",
     "xgboost>=3.3.0",
+    "fastapi",
+    "uvicorn",
+    "mlflow",
 ]
-
-[tool.setuptools]
-package-dir = {"" = "src"}
-
-[tool.setuptools.packages.find]
-where = ["src"]

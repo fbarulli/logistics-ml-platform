@@ -7,7 +7,7 @@ CREATE TABLE taxi_trips (
     dropoff_location_id INT
 )
 WITH (
-    'connector' = 'kafka',
+    'connector' = 'Kafka',
     'topic' = 'taxi-trips',
     'properties.bootstrap.servers' = 'kafka:9092',
     'format' = 'json'

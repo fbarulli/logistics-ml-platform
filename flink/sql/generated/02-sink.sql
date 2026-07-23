@@ -3,13 +3,13 @@ CREATE TABLE taxi_features (
     pickup_location_id INT,
     dropoff_location_id INT,
     trip_distance DOUBLE,
-    passenger_count INT,
+    passenger_count DOUBLE,
     pickup_hour INT,
     pickup_day_of_week INT,
     pickup_month INT
 )
 WITH (
-    'connector' = 'kafka',
+    'connector' = 'Kafka',
     'topic' = 'taxi-features',
     'properties.bootstrap.servers' = 'kafka:9092',
     'format' = 'json'

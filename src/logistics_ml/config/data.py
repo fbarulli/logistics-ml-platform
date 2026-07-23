@@ -15,12 +15,11 @@ class DataConfig:
 
     validation_cutoff: str = "2024-03-01"
 
-    raw_data_url: str = (
-        "https://d37ci6vzurychx.cloudfront.net/"
-        "trip-data/yellow_tripdata_2024-01.parquet"
+    taxi_urls: tuple[str, ...] = (
+        "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2024-01.parquet",
+        "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2024-02.parquet",
+        "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2024-03.parquet",
     )
-
-    raw_data_file: Path = raw_data_dir / "yellow_tripdata_2024-01.parquet"
 
 
 data = DataConfig()

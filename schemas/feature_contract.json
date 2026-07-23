@@ -2,23 +2,65 @@
   "raw_features": [
     {
       "name": "pickup_datetime",
-      "type": "<class 'datetime.datetime'>"
+      "logical": "datetime",
+      "flink": "STRING"
     },
     {
       "name": "passenger_count",
-      "type": "<class 'float'>"
+      "logical": "float",
+      "flink": "DOUBLE"
     },
     {
       "name": "trip_distance",
-      "type": "<class 'float'>"
+      "logical": "float",
+      "flink": "DOUBLE"
     },
     {
       "name": "pickup_location_id",
-      "type": "<class 'int'>"
+      "logical": "int",
+      "flink": "INT"
     },
     {
       "name": "dropoff_location_id",
-      "type": "<class 'int'>"
+      "logical": "int",
+      "flink": "INT"
+    }
+  ],
+  "stream_features": [
+    {
+      "name": "pickup_location_id",
+      "logical": "int",
+      "flink": "INT"
+    },
+    {
+      "name": "dropoff_location_id",
+      "logical": "int",
+      "flink": "INT"
+    },
+    {
+      "name": "trip_distance",
+      "logical": "float",
+      "flink": "DOUBLE"
+    },
+    {
+      "name": "passenger_count",
+      "logical": "float",
+      "flink": "DOUBLE"
+    },
+    {
+      "name": "pickup_hour",
+      "logical": "int",
+      "flink": "INT"
+    },
+    {
+      "name": "pickup_day_of_week",
+      "logical": "int",
+      "flink": "INT"
+    },
+    {
+      "name": "pickup_month",
+      "logical": "int",
+      "flink": "INT"
     }
   ],
   "required_order": [

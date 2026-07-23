@@ -6,6 +6,7 @@ import psycopg
 import requests
 from kafka import KafkaConsumer
 from kafka.errors import NoBrokersAvailable
+from logistics_ml.features.schema import STREAM_FEATURE_TYPES
 
 logging.basicConfig(
     level=logging.INFO,
@@ -64,13 +65,8 @@ for message in consumer:
         event = message.value
 
         payload = {
-            "pickup_hour": event["pickup_hour"],
-            "pickup_day_of_week": event["pickup_day_of_week"],
-            "pickup_month": event["pickup_month"],
-            "trip_distance": event["trip_distance"],
-            "passenger_count": event["passenger_count"],
-            "pickup_location_id": event["pickup_location_id"],
-            "dropoff_location_id": event["dropoff_location_id"],
+            name: event[name]
+            for name in STREAM_FEATURE_TYPES
         }
 
         while True:

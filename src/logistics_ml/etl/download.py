@@ -6,14 +6,18 @@ from logistics_ml.config import data as data_config
 def download_data():
     data_config.raw_data_dir.mkdir(parents=True, exist_ok=True)
 
-    if data_config.raw_data_file.exists():
-        print(f"✓ {data_config.raw_data_file} already exists.")
-        return
+    for url in data_config.taxi_urls:
+        filename = url.split("/")[-1]
+        target = data_config.raw_data_dir / filename
 
-    print(f"Downloading {data_config.raw_data_url}")
-    urllib.request.urlretrieve(data_config.raw_data_url, data_config.raw_data_file)
+        if target.exists():
+            print(f"✓ {target} already exists.")
+            continue
 
-    print(f"✓ Saved to {data_config.raw_data_file}")
+        print(f"Downloading {url}")
+        urllib.request.urlretrieve(url, target)
+
+        print(f"✓ Saved to {target}")
 
 
 def main():

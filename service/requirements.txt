@@ -1,8 +1,0 @@
-fastapi
-uvicorn
-pandas
-mlflow
-psycopg[binary]
-scikit-learn
-xgboost
-prometheus-client

@@ -1,8 +1,10 @@
 from pathlib import Path
 import io
 import time
+
 import pyarrow.parquet as pq
 from tqdm import tqdm
+
 from logistics_ml.db import engine
 
 RAW_DIR = Path("data/raw")
@@ -13,46 +15,126 @@ RENAME = {
     "tpep_pickup_datetime": "pickup_datetime",
     "tpep_dropoff_datetime": "dropoff_datetime",
 }
+
 BATCH_SIZE = 200_000
 
 
-def load_taxi_trips():
+def get_parquet_files():
     files = sorted(RAW_DIR.glob("yellow_tripdata_*.parquet"))
-    print("Loading taxi trips...")
     print(f"Found {len(files)} files: {[f.name for f in files]}")
-    total_rows = 0
+    return files
+
+
+def ensure_manifest_table(conn):
+    conn.exec_driver_sql(
+        """
+        CREATE TABLE IF NOT EXISTS etl_file_manifest (
+            filename TEXT PRIMARY KEY,
+            row_count INTEGER NOT NULL,
+            loaded_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+        """
+    )
+
+
+def get_loaded_files():
     with engine.begin() as conn:
-        conn.exec_driver_sql("TRUNCATE TABLE taxi_trips")
-        existing_cols = [
-            row[0] for row in conn.exec_driver_sql(
-                "SELECT column_name FROM information_schema.columns "
+        ensure_manifest_table(conn)
+        return {
+            row[0]
+            for row in conn.exec_driver_sql(
+                "SELECT filename FROM etl_file_manifest"
+            )
+        }
+
+
+def mark_file_loaded(filename, row_count):
+    with engine.begin() as conn:
+        conn.exec_driver_sql(
+            "INSERT INTO etl_file_manifest (filename, row_count) VALUES (%s, %s)",
+            (filename, row_count),
+        )
+
+
+def get_existing_columns():
+    with engine.begin() as conn:
+        return [
+            row[0]
+            for row in conn.exec_driver_sql(
+                "SELECT column_name "
+                "FROM information_schema.columns "
                 "WHERE table_name = 'taxi_trips'"
             )
         ]
+
+
+def load_parquet_batch(batch, existing_cols):
+    part = batch.to_pandas()
+    part.columns = [c.lower() for c in part.columns]
+    part = part.rename(columns=RENAME)
+    part = part[[c for c in part.columns if c in existing_cols]]
+    return part
+
+
+def copy_batch(raw_conn, part):
+    buf = io.StringIO()
+    part.to_csv(buf, index=False, header=False)
+    buf.seek(0)
+
+    with raw_conn.cursor() as cur:
+        cols = ",".join(part.columns)
+        with cur.copy(
+            f"COPY taxi_trips ({cols}) FROM STDIN WITH (FORMAT CSV)"
+        ) as copy:
+            copy.write(buf.read())
+    # no commit here — caller commits once per file
+
+
+def load_taxi_trips():
+    print("Loading taxi trips...")
+
+    files = get_parquet_files()
+    existing_cols = get_existing_columns()
+    already_loaded = get_loaded_files()
+
+    total_rows = 0
     raw_conn = engine.raw_connection()
+
     try:
-        for f in tqdm(files, desc="Files"):
+        for f in files:
+            if f.name in already_loaded:
+                print(f"Skipping {f.name} (already loaded)")
+                continue
+
+            print(f"Processing {f.name}...")
             start = time.time()
-            file_rows = 0
+
             parquet_file = pq.ParquetFile(f)
-            for batch in parquet_file.iter_batches(batch_size=BATCH_SIZE):
-                part = batch.to_pandas()
-                part.columns = [c.lower() for c in part.columns]
-                part = part.rename(columns=RENAME)
-                part = part[[c for c in part.columns if c in existing_cols]]
-                buf = io.StringIO()
-                part.to_csv(buf, index=False, header=False)
-                buf.seek(0)
-                with raw_conn.cursor() as cur:
-                    cols = ",".join(part.columns)
-                    with cur.copy(
-                        f"COPY taxi_trips ({cols}) FROM STDIN WITH (FORMAT CSV)"
-                    ) as copy:
-                        copy.write(buf.read())
+            file_rows = 0
+
+            try:
+                for batch in tqdm(
+                    parquet_file.iter_batches(batch_size=BATCH_SIZE),
+                    desc=f.name,
+                    unit="batch",
+                ):
+                    part = load_parquet_batch(batch, existing_cols)
+                    copy_batch(raw_conn, part)
+                    file_rows += len(part)
+
                 raw_conn.commit()
-                file_rows += len(part)
-            total_rows += file_rows
-            print(f"  {f.name}: {file_rows:,} rows in {time.time() - start:.1f}s")
+                mark_file_loaded(f.name, file_rows)
+                total_rows += file_rows
+                print(
+                    f"Finished {f.name}: "
+                    f"{file_rows:,} rows "
+                    f"in {time.time() - start:.1f}s"
+                )
+            except Exception:
+                raw_conn.rollback()
+                raise
+
     finally:
         raw_conn.close()
-    print(f"Loaded taxi_trips: {total_rows:,} rows")
+
+    print(f"Loaded {total_rows:,} rows")

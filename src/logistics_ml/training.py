@@ -5,7 +5,7 @@ import time
 
 import mlflow
 
-from logistics_ml.config import mlflow as mlflow_config
+from logistics_ml.config.mlflow import mlflow as mlflow_config
 from logistics_ml.data import load_training_data
 from logistics_ml.evaluation import evaluate
 from logistics_ml.features import prepare_dataset
