@@ -27,10 +27,8 @@ jobs:
         run: git diff --exit-code
       - name: Validate Kubernetes manifests
         run: |
-          kubectl apply \
-            --dry-run=client \
-            --validate=false \
-            -f k8s/
+          curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz kubeconform
+          ./kubeconform -strict -summary -kubernetes-version 1.30.0 k8s/
       - name: Check Python entrypoints exist
         run: |
           python - <<'PY'
