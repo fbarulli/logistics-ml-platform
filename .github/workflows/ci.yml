@@ -2,7 +2,6 @@ name: CI
 
 on:
   push:
-    branches: [**]
   pull_request:
 
 permissions:
@@ -52,7 +51,7 @@ jobs:
 
   build-python-base:
     needs: validate
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -89,7 +88,7 @@ jobs:
 
   build-python:
     needs: build-python-base
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -128,7 +127,7 @@ jobs:
 
   mlflow-build:
     needs: validate
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
