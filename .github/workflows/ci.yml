@@ -36,11 +36,13 @@ jobs:
           import re
           import sys
           compose = pathlib.Path("docker-compose.yml").read_text()
-          modules = re.findall(r'logistics_ml\.([A-Za-z0-9_]+)', compose)
+          modules = sorted(set(re.findall(r'logistics_ml\.([A-Za-z0-9_.]+)', compose)))
           missing = []
           for module in modules:
-              path = pathlib.Path(f"src/logistics_ml/{module}.py")
-              if not path.exists():
+              rel = module.replace(".", "/")
+              as_file = pathlib.Path(f"src/logistics_ml/{rel}.py")
+              as_package = pathlib.Path(f"src/logistics_ml/{rel}/__init__.py")
+              if not as_file.exists() and not as_package.exists():
                   missing.append(module)
           if missing:
               print("Missing modules:", missing)
