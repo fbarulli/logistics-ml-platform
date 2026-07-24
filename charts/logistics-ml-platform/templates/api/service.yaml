@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "logistics.fullname" . }}-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "logistics.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "logistics.selectorLabels" (dict "component" "api" "context" .) | nindent 4 }}
+  ports:
+    - port: 8000
+      targetPort: 8000

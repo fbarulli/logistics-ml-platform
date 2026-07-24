@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "logistics.fullname" . }}-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "logistics.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "logistics.selectorLabels" (dict "component" "api" "context" .) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "logistics.selectorLabels" (dict "component" "api" "context" .) | nindent 8 }}
+    spec:
+      imagePullSecrets:
+        - name: {{ include "logistics.fullname" . }}-ghcr-pull-secret
+      containers:
+        - name: api
+          image: "{{ .Values.global.pythonImage.repository }}:{{ .Values.global.pythonImage.tag }}"
+          imagePullPolicy: {{ .Values.api.imagePullPolicy }}
+          command:
+            {{- toYaml .Values.api.command | nindent 12 }}
+          ports:
+            - containerPort: 8000
+          env:
+            - name: MLFLOW_TRACKING_URI
+              value: "http://mlflow:5000"
+            - name: DATABASE_URL
+              value: {{ include "logistics.postgres.databaseUrl" . | quote }}
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          volumeMounts:
+            - name: mlflow-artifacts
+              mountPath: /mlflow/artifacts
+          startupProbe:
+            tcpSocket:
+              port: 8000
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            tcpSocket:
+              port: 8000
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 8000
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+      volumes:
+        - name: mlflow-artifacts
+          persistentVolumeClaim:
+            claimName: {{ include "logistics.fullname" . }}-mlflow-artifacts-pvc

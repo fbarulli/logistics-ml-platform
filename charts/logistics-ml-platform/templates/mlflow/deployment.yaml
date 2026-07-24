@@ -15,6 +15,8 @@ spec:
       labels:
         {{- include "logistics.selectorLabels" (dict "component" "mlflow" "context" .) | nindent 8 }}
     spec:
+      imagePullSecrets:
+        - name: {{ include "logistics.fullname" . }}-ghcr-pull-secret
       containers:
         - name: mlflow
           image: {{ .Values.mlflow.image }}
