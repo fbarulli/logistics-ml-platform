@@ -126,7 +126,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   mlflow-build:
-    needs: validate
+    needs: build-python-base
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
@@ -159,5 +159,7 @@ jobs:
           file: docker/mlflow/Dockerfile
           push: true
           platforms: linux/arm64
+          build-args: |
+            BASE_IMAGE=ghcr.io/fbarulli/logistics-python-base:latest
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
