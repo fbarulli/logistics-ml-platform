@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "logistics.fullname" . }}-mlflow
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "logistics.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "logistics.selectorLabels" (dict "component" "mlflow" "context" .) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "logistics.selectorLabels" (dict "component" "mlflow" "context" .) | nindent 8 }}
+    spec:
+      containers:
+        - name: mlflow
+          image: {{ .Values.mlflow.image }}
+          imagePullPolicy: {{ .Values.mlflow.pullPolicy }}
+          ports:
+            - containerPort: 5000
+          volumeMounts:
+            - name: mlflow-artifacts
+              mountPath: /mlflow/artifacts
+          readinessProbe:
+            tcpSocket:
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+      volumes:
+        - name: mlflow-artifacts
+          persistentVolumeClaim:
+            claimName: {{ include "logistics.fullname" . }}-mlflow-artifacts-pvc

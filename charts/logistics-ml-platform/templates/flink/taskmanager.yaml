@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "logistics.fullname" . }}-flink-taskmanager
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "logistics.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "logistics.selectorLabels" (dict "component" "taskmanager" "context" .) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "logistics.selectorLabels" (dict "component" "taskmanager" "context" .) | nindent 8 }}
+    spec:
+      containers:
+        - name: taskmanager
+          image: {{ .Values.flink.image }}
+          imagePullPolicy: {{ .Values.flink.pullPolicy }}
+          args: ["taskmanager"]
+          env:
+            - name: FLINK_PROPERTIES
+              value: |
+                jobmanager.rpc.address: jobmanager
+                taskmanager.numberOfTaskSlots: {{ .Values.flink.taskmanager.numberOfTaskSlots }}
+          volumeMounts:
+            - name: flink-sql
+              mountPath: /opt/flink/sql/run.sql
+              subPath: run.sql
+            - name: flink-sql
+              mountPath: /opt/flink/sql/generated/01-source.sql
+              subPath: 01-source.sql
+            - name: flink-sql
+              mountPath: /opt/flink/sql/generated/02-sink.sql
+              subPath: 02-sink.sql
+            - name: flink-sql
+              mountPath: /opt/flink/sql/generated/03-transform.sql
+              subPath: 03-transform.sql
+      volumes:
+        - name: flink-sql
+          configMap:
+            name: {{ include "logistics.fullname" . }}-flink-sql

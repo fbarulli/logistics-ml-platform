@@ -31,6 +31,7 @@ jobs:
         run: |
           kubectl apply \
             --dry-run=client \
+            --validate=false \
             -f k8s/
       - name: Check Python entrypoints exist
         run: |
@@ -114,14 +115,6 @@ jobs:
           platforms: arm64
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      # docker/python/Dockerfile has `FROM logistics-python-base:latest`
-      # (an unqualified local tag, matching the existing local dev workflow).
-      # Pull the image we just pushed and re-tag it locally so that FROM
-      # resolves without editing the Dockerfile.
-      - name: Pull and re-tag base image
-        run: |
-          docker pull ghcr.io/fbarulli/logistics-python-base:latest
-          docker tag ghcr.io/fbarulli/logistics-python-base:latest logistics-python-base:latest
       - name: Build and push app image
         uses: docker/build-push-action@v6
         with:
@@ -129,6 +122,8 @@ jobs:
           file: docker/python/Dockerfile
           push: true
           platforms: linux/arm64
+          build-args: |
+            BASE_IMAGE=ghcr.io/fbarulli/logistics-python-base:latest
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 

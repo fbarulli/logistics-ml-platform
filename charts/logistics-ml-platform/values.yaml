@@ -1,0 +1,74 @@
+# Default values for logistics-ml-platform.
+
+global:
+  pythonImage:
+    repository: ghcr.io/fbarulli/logistics-python
+    tag: latest
+    pullPolicy: Always
+  ghcr:
+    username: fbarulli
+    token: "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" # needs read:packages scope
+
+postgres:
+  image: postgres:17
+  auth:
+    database: logistics
+    username: logistics
+    password: logistics
+  persistence:
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+kafka:
+  image: apache/kafka:3.8.0
+  nodeId: "1"
+
+mlflow:
+  image: ghcr.io/fbarulli/logistics-ml-platform-mlflow:latest
+  pullPolicy: Always
+  persistence:
+    size: 5Gi
+
+flink:
+  image: flink:local
+  pullPolicy: IfNotPresent
+  submitJobImage: flink-submit:local
+  taskmanager:
+    numberOfTaskSlots: 2
+
+training:
+  image: training:local
+  pullPolicy: IfNotPresent
+
+data:
+  persistence:
+    size: 5Gi
+
+etl:
+  imagePullPolicy: Always
+
+api:
+  imagePullPolicy: Always
+  command:
+    - uvicorn
+    - logistics_ml.api:app
+    - --host
+    - "0.0.0.0"
+    - --port
+    - "8000"
+  resources: {}
+
+dozzle:
+  enabled: true
+  namespace: monitoring
+  image: amir20/dozzle:latest
+
+data:
+  persistence:
+    size: 5Gi

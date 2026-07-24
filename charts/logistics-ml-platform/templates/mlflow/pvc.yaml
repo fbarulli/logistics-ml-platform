@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "logistics.fullname" . }}-mlflow-artifacts-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "logistics.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.mlflow.persistence.size }}

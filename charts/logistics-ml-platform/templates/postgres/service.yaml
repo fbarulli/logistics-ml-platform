@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  # Unprefixed: app code / DATABASE_URL connect via the stable DNS name "postgres".
+  name: postgres
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "logistics.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "logistics.selectorLabels" (dict "component" "postgres" "context" .) | nindent 4 }}
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432

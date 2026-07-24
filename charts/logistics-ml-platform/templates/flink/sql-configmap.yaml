@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "logistics.fullname" . }}-flink-sql
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "logistics.labels" . | nindent 4 }}
+data:
+  run.sql: |-
+{{ .Files.Get "files/flink-sql/run.sql" | indent 4 }}
+  01-source.sql: |-
+{{ .Files.Get "files/flink-sql/01-source.sql" | indent 4 }}
+  02-sink.sql: |-
+{{ .Files.Get "files/flink-sql/02-sink.sql" | indent 4 }}
+  03-transform.sql: |-
+{{ .Files.Get "files/flink-sql/03-transform.sql" | indent 4 }}

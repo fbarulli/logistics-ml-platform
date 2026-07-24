@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "logistics.fullname" . }}-flink-submit
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "logistics.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: submitter
+          image: {{ .Values.flink.submitJobImage }}
+          imagePullPolicy: {{ .Values.flink.pullPolicy }}
+          volumeMounts:
+            - name: flink-sql
+              mountPath: /opt/flink/sql/run.sql
+              subPath: run.sql
+            - name: flink-sql
+              mountPath: /opt/flink/sql/generated/01-source.sql
+              subPath: 01-source.sql
+            - name: flink-sql
+              mountPath: /opt/flink/sql/generated/02-sink.sql
+              subPath: 02-sink.sql
+            - name: flink-sql
+              mountPath: /opt/flink/sql/generated/03-transform.sql
+              subPath: 03-transform.sql
+      volumes:
+        - name: flink-sql
+          configMap:
+            name: {{ include "logistics.fullname" . }}-flink-sql

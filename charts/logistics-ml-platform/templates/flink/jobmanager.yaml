@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "logistics.fullname" . }}-flink-jobmanager
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "logistics.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "logistics.selectorLabels" (dict "component" "jobmanager" "context" .) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "logistics.selectorLabels" (dict "component" "jobmanager" "context" .) | nindent 8 }}
+    spec:
+      containers:
+        - name: jobmanager
+          image: {{ .Values.flink.image }}
+          imagePullPolicy: {{ .Values.flink.pullPolicy }}
+          args: ["jobmanager"]
+          ports:
+            - containerPort: 8081
+          env:
+            - name: FLINK_PROPERTIES
+              value: |
+                jobmanager.rpc.address: jobmanager
+          volumeMounts:
+            - name: flink-sql
+              mountPath: /opt/flink/sql/run.sql
+              subPath: run.sql
+            - name: flink-sql
+              mountPath: /opt/flink/sql/generated/01-source.sql
+              subPath: 01-source.sql
+            - name: flink-sql
+              mountPath: /opt/flink/sql/generated/02-sink.sql
+              subPath: 02-sink.sql
+            - name: flink-sql
+              mountPath: /opt/flink/sql/generated/03-transform.sql
+              subPath: 03-transform.sql
+      volumes:
+        - name: flink-sql
+          configMap:
+            name: {{ include "logistics.fullname" . }}-flink-sql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  # Unprefixed: jobmanager.rpc.address hardcodes "jobmanager" across taskmanager/sql-gateway.
+  name: jobmanager
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "logistics.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "logistics.selectorLabels" (dict "component" "jobmanager" "context" .) | nindent 4 }}
+  ports:
+    - name: rpc
+      port: 6123
+      targetPort: 6123
+    - name: ui
+      port: 8081
+      targetPort: 8081

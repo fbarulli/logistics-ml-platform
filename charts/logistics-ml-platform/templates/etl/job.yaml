@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "logistics.fullname" . }}-etl
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "logistics.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: {{ include "logistics.fullname" . }}-ghcr-pull-secret
+      containers:
+        - name: etl
+          image: "{{ .Values.global.pythonImage.repository }}:{{ .Values.global.pythonImage.tag }}"
+          imagePullPolicy: {{ .Values.etl.imagePullPolicy }}
+          command:
+            - python
+            - -u
+            - -m
+            - logistics_ml.etl.run
+          env:
+            - name: DATABASE_URL
+              value: {{ include "logistics.postgres.databaseUrl" . | quote }}
+          volumeMounts:
+            - name: data
+              mountPath: /workspace/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "logistics.fullname" . }}-data-pvc

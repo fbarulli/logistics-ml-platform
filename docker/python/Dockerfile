@@ -1,4 +1,5 @@
-FROM logistics-python-base:latest
+ARG BASE_IMAGE=logistics-python-base:latest
+FROM ${BASE_IMAGE}
 
 WORKDIR /workspace
 
